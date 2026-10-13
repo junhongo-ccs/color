@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>sRGB Color Solid Surface</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    color: #fff; font: 13px system-ui, sans-serif;
+    background: rgba(0,0,0,.55); padding: 10px 12px; border-radius: 8px;
+    line-height: 1.8;
+  }
+  button {
+    font: inherit; margin-right: 8px; padding: 4px 10px;
+    border: 0; border-radius: 6px; cursor: pointer;
+  }
+  #axisLabel { color: #bbb; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <button id="toggleSpace">表示: xyY</button>
+  <button id="toggleWire">ワイヤーフレーム: OFF</button>
+  <button id="toggleRotate">自動回転: ON</button>
+  <span>ドラッグ: 回転 ／ ホイール: ズーム ／ 右ドラッグ: パン</span><br />
+  <span id="axisLabel"></span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ------------------------------------------------------------
+// 1. 色変換
+// ------------------------------------------------------------
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+// sRGB(D65) -> CIE XYZ
+const M = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.0721750],
+  [0.0193339, 0.1191920, 0.9503041]
+];
+
+function linearToXYZ([r, g, b]) {
+  return M.map((row) => row[0] * r + row[1] * g + row[2] * b);
+}
+
+// D65 白色点
+const WHITE_XYZ = [0.95047, 1.0, 1.08883];
+
+const DELTA = 6 / 29;
+function labF(t) {
+  return t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29;
+}
+
+// ------------------------------------------------------------
+// 2. sRGB立方体の6面を外殻メッシュにする
+//
+// RGB→XYZ は線形な1対1写像なので、立方体の表面がそのまま色域の外殻になる。
+//   ・R=1, G=1, B=1 の3面 … 上側の面（その色度で最も明るい色）
+//   ・R=0, G=0, B=0 の3面 … xyY では色度三角形の各辺に立つ垂直の壁
+//   ・黒の頂点           … xyY では Y=0 の色度三角形（底面）に広がる
+// ------------------------------------------------------------
+const S = 48; // 1面あたりの分割数
+
+const xyyPositions = [];
+const labPositions = [];
+const colors = [];
+const indices = [];
+let vertexCount = 0;
+
+// lin: この頂点の線形RGB
+// chromaLin: xyY の色度を求めるための線形RGB（黒に近い壁で色度を保つため）
+function pushVertex(lin, chromaLin = lin) {
+  const [X, Y, Z] = linearToXYZ(lin);
+  const [cX, cY, cZ] = linearToXYZ(chromaLin);
+  const sum = cX + cY + cZ;
+  const x = cX / sum;
+  const y = cY / sum;
+
+  const fx = labF(X / WHITE_XYZ[0]);
+  const fy = labF(Y / WHITE_XYZ[1]);
+  const fz = labF(Z / WHITE_XYZ[2]);
+  const L = 116 * fy - 16;
+  const A = 500 * (fx - fy);
+  const B = 200 * (fy - fz);
+
+  // 明るさ（Y / L*）はどちらも -1.5〜4.5 に揃える。
+  // 色度 y と b* は -Z 方向に置き、真上から見たとき色度図・a*b*平面と同じ向きにする。
+  xyyPositions.push((x - 0.33) * 8, Y * 6 - 1.5, -(y - 0.33) * 8);
+  labPositions.push(A * 0.025, (L / 100) * 6 - 1.5, -B * 0.025);
+
+  // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する
+  colors.push(lin[0], lin[1], lin[2]);
+  return vertexCount++;
+}
+
+// (nu+1)×(nv+1) の格子パッチを追加。sample(u, v) は { lin, chroma? } を返す
+function addPatch(nu, nv, sample) {
+  const base = vertexCount;
+  for (let j = 0; j <= nv; j++) {
+    for (let i = 0; i <= nu; i++) {
+      const { lin, chroma } = sample(i / nu, j / nv);
+      pushVertex(lin, chroma);
+    }
+  }
+  const row = nu + 1;
+  for (let j = 0; j < nv; j++) {
+    for (let i = 0; i < nu; i++) {
+      const a = base + j * row + i;
+      const b = a + 1;
+      const c = a + row;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+}
+
+const toLinear = (enc) => enc.map(srgbToLinear);
+
+// 上側の3面：チャンネル k を 1 に固定し、残り2チャンネルを sRGB 値で均等に分割
+for (let k = 0; k < 3; k++) {
+  const [p, q] = [0, 1, 2].filter((c) => c !== k);
+  addPatch(S, S, (u, v) => {
+    const enc = [0, 0, 0];
+    enc[k] = 1;
+    enc[p] = u;
+    enc[q] = v;
+    return { lin: toLinear(enc) };
+  });
+}
+
+// 壁の3面：チャンネル k が 0 の面を「黒からの光線」として張る。
+//   t: 原色p → p+q の混色 → 原色q と上側の縁をたどる
+//   s: 黒(0) → 縁(1) の明るさ。線形RGBでスケールするので色度は光線上で一定
+for (let k = 0; k < 3; k++) {
+  const [p, q] = [0, 1, 2].filter((c) => c !== k);
+  addPatch(2 * S, S, (t, s) => {
+    const enc = [0, 0, 0];
+    enc[p] = t < 0.5 ? 1 : 2 - 2 * t;
+    enc[q] = t < 0.5 ? 2 * t : 1;
+    const edge = toLinear(enc);
+    const sLin = srgbToLinear(s);
+    return { lin: edge.map((c) => c * sLin), chroma: edge };
+  });
+}
+
+// 底面：xyY では Y=0 の色度三角形、CIELAB では黒の1点に縮退する
+{
+  const r = pushVertex([0, 0, 0], [1, 0, 0]);
+  const g = pushVertex([0, 0, 0], [0, 1, 0]);
+  const b = pushVertex([0, 0, 0], [0, 0, 1]);
+  indices.push(r, g, b);
+}
+
+const SPACES = {
+  xyY: {
+    positions: new Float32Array(xyyPositions),
+    axes: "横: 色度 x ／ 縦: 輝度 Y ／ 奥行: 色度 y"
+  },
+  CIELAB: {
+    positions: new Float32Array(labPositions),
+    axes: "横: a*（緑→赤） ／ 縦: L* ／ 奥行: b*（青→黄）"
+  }
+};
+
+// ------------------------------------------------------------
+// 3. メッシュを作成
+// ------------------------------------------------------------
+const geometry = new THREE.BufferGeometry();
+
+const positionAttr = new THREE.BufferAttribute(
+  SPACES.xyY.positions.slice(),
+  3
+);
+positionAttr.setUsage(THREE.DynamicDrawUsage);
+geometry.setAttribute("position", positionAttr);
+
+geometry.setAttribute(
+  "color",
+  new THREE.Float32BufferAttribute(colors, 3)
+);
+geometry.setIndex(indices);
+
+// 光源の影響を受けない MeshBasicMaterial で、色そのものを正確に見せる
+const material = new THREE.MeshBasicMaterial({
+  vertexColors: true,
+  side: THREE.DoubleSide,
+  wireframe: false
+});
+
+const surface = new THREE.Mesh(geometry, material);
+// 切替アニメーション中に境界球が古くなるため、視錐台カリングを無効にする
+surface.frustumCulled = false;
+
+// ------------------------------------------------------------
+// 4. シーン・カメラ・レンダラー
+// ------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(3.2, 3.7, 4.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+scene.add(surface);
+
+const axes = new THREE.AxesHelper(2.5);
+scene.add(axes);
+
+// ------------------------------------------------------------
+// 5. OrbitControls
+// ------------------------------------------------------------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, 0); // 立体の中心付近（明るさ 0〜1 → 表示 -1.5〜4.5）
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.minDistance = 1.5;
+controls.maxDistance = 15;
+
+// ------------------------------------------------------------
+// 6. 色空間の切替（xyY ⇔ CIELAB をモーフィング）
+// ------------------------------------------------------------
+const MORPH_SECONDS = 0.9;
+let currentSpace = "xyY";
+let morphFrom = null; // 切替開始時点の座標
+let morphTo = null;
+let morphT = 1;
+
+const spaceButton = document.getElementById("toggleSpace");
+const axisLabel = document.getElementById("axisLabel");
+axisLabel.textContent = SPACES.xyY.axes;
+
+spaceButton.addEventListener("click", () => {
+  currentSpace = currentSpace === "xyY" ? "CIELAB" : "xyY";
+  // 切替途中で押された場合も、今の位置から滑らかに向かう
+  morphFrom = positionAttr.array.slice();
+  morphTo = SPACES[currentSpace].positions;
+  morphT = 0;
+  spaceButton.textContent = `表示: ${currentSpace}`;
+  axisLabel.textContent = SPACES[currentSpace].axes;
+});
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function updateMorph(dt) {
+  if (morphT >= 1) return;
+  morphT = Math.min(1, morphT + dt / MORPH_SECONDS);
+  const k = easeInOutCubic(morphT);
+  const arr = positionAttr.array;
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = morphFrom[i] + (morphTo[i] - morphFrom[i]) * k;
+  }
+  positionAttr.needsUpdate = true;
+}
+
+// ------------------------------------------------------------
+// 7. アニメーションループ
+// ------------------------------------------------------------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  updateMorph(clock.getDelta());
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ------------------------------------------------------------
+// 8. ボタン
+// ------------------------------------------------------------
+const wireButton = document.getElementById("toggleWire");
+wireButton.addEventListener("click", () => {
+  material.wireframe = !material.wireframe;
+  wireButton.textContent = `ワイヤーフレーム: ${material.wireframe ? "ON" : "OFF"}`;
+});
+
+const rotateButton = document.getElementById("toggleRotate");
+rotateButton.addEventListener("click", () => {
+  controls.autoRotate = !controls.autoRotate;
+  rotateButton.textContent = `自動回転: ${controls.autoRotate ? "ON" : "OFF"}`;
+});
+
+// ------------------------------------------------------------
+// 9. リサイズ対応
+// ------------------------------------------------------------
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>

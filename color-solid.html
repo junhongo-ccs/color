@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>sRGB Color Solid</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; top: 12px; left: 12px; z-index: 10;
+    color: #fff; font: 13px system-ui, sans-serif;
+    background: rgba(0,0,0,.55); padding: 10px 12px; border-radius: 8px;
+    line-height: 1.8;
+  }
+  button {
+    font: inherit; margin-right: 8px; padding: 4px 10px;
+    border: 0; border-radius: 6px; cursor: pointer;
+  }
+  #axisLabel { color: #bbb; }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <button id="toggleSpace">表示: xyY</button>
+  <button id="toggleRotate">自動回転: ON</button>
+  <span>ドラッグ: 回転 ／ ホイール: ズーム ／ 右ドラッグ: パン</span><br />
+  <span id="axisLabel"></span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ------------------------------------------------------------
+// 1. sRGB立方体をサンプリング
+// ------------------------------------------------------------
+const N = 18; // 粗さ。24〜32にすると精密になるが点数は急増する
+const xyyPositions = [];
+const labPositions = [];
+const colors = [];
+
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+// sRGB(D65) -> CIE XYZ
+const M = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.0721750],
+  [0.0193339, 0.1191920, 0.9503041]
+];
+
+// D65 白色点（XYZ と xy）
+const WHITE_XYZ = [0.95047, 1.0, 1.08883];
+const WHITE_XY = [0.3127, 0.3290];
+
+// CIELAB の非線形関数
+const DELTA = 6 / 29;
+function labF(t) {
+  return t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29;
+}
+
+for (let ri = 0; ri < N; ri++) {
+  for (let gi = 0; gi < N; gi++) {
+    for (let bi = 0; bi < N; bi++) {
+      const r = ri / (N - 1);
+      const g = gi / (N - 1);
+      const b = bi / (N - 1);
+
+      const lr = srgbToLinear(r);
+      const lg = srgbToLinear(g);
+      const lb = srgbToLinear(b);
+
+      const X = M[0][0] * lr + M[0][1] * lg + M[0][2] * lb;
+      const Y = M[1][0] * lr + M[1][1] * lg + M[1][2] * lb;
+      const Z = M[2][0] * lr + M[2][1] * lg + M[2][2] * lb;
+
+      // XYZ -> xyY（黒は色度が定義できないので白色点の色度に置く）
+      const sum = X + Y + Z;
+      const x = sum > 1e-12 ? X / sum : WHITE_XY[0];
+      const y = sum > 1e-12 ? Y / sum : WHITE_XY[1];
+
+      // XYZ -> CIELAB
+      const fx = labF(X / WHITE_XYZ[0]);
+      const fy = labF(Y / WHITE_XYZ[1]);
+      const fz = labF(Z / WHITE_XYZ[2]);
+      const L = 116 * fy - 16;
+      const A = 500 * (fx - fy);
+      const B = 200 * (fy - fz);
+
+      // 表示用にスケール調整。明るさ（Y / L*）はどちらも -1.5〜4.5 に揃える。
+      // 色度 y と b* は -Z 方向に置き、真上から見たとき色度図・a*b*平面と同じ向きになるようにする。
+      xyyPositions.push(
+        (x - 0.33) * 8,
+        Y * 6 - 1.5,
+        -(y - 0.33) * 8
+      );
+      labPositions.push(
+        A * 0.025,
+        (L / 100) * 6 - 1.5,
+        -B * 0.025
+      );
+
+      // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する。
+      // 線形値を渡すことで、画面上の点色が元のsRGB色と一致する。
+      colors.push(lr, lg, lb);
+    }
+  }
+}
+
+const SPACES = {
+  xyY: {
+    positions: new Float32Array(xyyPositions),
+    axes: "横: 色度 x ／ 縦: 輝度 Y ／ 奥行: 色度 y"
+  },
+  CIELAB: {
+    positions: new Float32Array(labPositions),
+    axes: "横: a*（緑→赤） ／ 縦: L* ／ 奥行: b*（青→黄）"
+  }
+};
+
+// ------------------------------------------------------------
+// 2. 点群ジオメトリを作成
+// ------------------------------------------------------------
+const geometry = new THREE.BufferGeometry();
+
+const positionAttr = new THREE.BufferAttribute(
+  SPACES.xyY.positions.slice(),
+  3
+);
+positionAttr.setUsage(THREE.DynamicDrawUsage);
+geometry.setAttribute("position", positionAttr);
+
+geometry.setAttribute(
+  "color",
+  new THREE.Float32BufferAttribute(colors, 3)
+);
+
+const material = new THREE.PointsMaterial({
+  size: 0.045,
+  vertexColors: true,
+  sizeAttenuation: true
+});
+
+const points = new THREE.Points(geometry, material);
+// 切替アニメーション中に境界球が古くなるため、視錐台カリングを無効にする
+points.frustumCulled = false;
+
+// ------------------------------------------------------------
+// 3. シーン・カメラ・レンダラー
+// ------------------------------------------------------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+camera.position.set(3.2, 3.7, 4.2);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+// ------------------------------------------------------------
+// 4. 補助軸
+// ------------------------------------------------------------
+const axes = new THREE.AxesHelper(2.5);
+scene.add(axes);
+scene.add(points);
+
+// ------------------------------------------------------------
+// 5. OrbitControls：マウス・タッチ操作
+// ------------------------------------------------------------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, 0); // 立体の中心付近（明るさ 0〜1 → 表示 -1.5〜4.5）
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.minDistance = 1.5;
+controls.maxDistance = 15;
+
+// ------------------------------------------------------------
+// 6. 色空間の切替（xyY ⇔ CIELAB をモーフィング）
+// ------------------------------------------------------------
+const MORPH_SECONDS = 0.9;
+let currentSpace = "xyY";
+let morphFrom = null; // 切替開始時点の座標
+let morphTo = null;
+let morphT = 1;
+
+const spaceButton = document.getElementById("toggleSpace");
+const axisLabel = document.getElementById("axisLabel");
+axisLabel.textContent = SPACES.xyY.axes;
+
+spaceButton.addEventListener("click", () => {
+  currentSpace = currentSpace === "xyY" ? "CIELAB" : "xyY";
+  // 切替途中で押された場合も、今の位置から滑らかに向かう
+  morphFrom = positionAttr.array.slice();
+  morphTo = SPACES[currentSpace].positions;
+  morphT = 0;
+  spaceButton.textContent = `表示: ${currentSpace}`;
+  axisLabel.textContent = SPACES[currentSpace].axes;
+});
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function updateMorph(dt) {
+  if (morphT >= 1) return;
+  morphT = Math.min(1, morphT + dt / MORPH_SECONDS);
+  const k = easeInOutCubic(morphT);
+  const arr = positionAttr.array;
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = morphFrom[i] + (morphTo[i] - morphFrom[i]) * k;
+  }
+  positionAttr.needsUpdate = true;
+}
+
+// ------------------------------------------------------------
+// 7. アニメーションループ
+// ------------------------------------------------------------
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  updateMorph(clock.getDelta());
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// ------------------------------------------------------------
+// 8. 自動回転のON/OFF
+// ------------------------------------------------------------
+const rotateButton = document.getElementById("toggleRotate");
+rotateButton.addEventListener("click", () => {
+  controls.autoRotate = !controls.autoRotate;
+  rotateButton.textContent = `自動回転: ${controls.autoRotate ? "ON" : "OFF"}`;
+});
+
+// ------------------------------------------------------------
+// 9. リサイズ対応
+// ------------------------------------------------------------
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sRGB Color Solid</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #111; color: #eee; }
+  body { font: 15px/1.7 system-ui, sans-serif; padding: 48px 16px; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { color: #bbb; margin: 0 0 24px; }
+  a.card {
+    display: block; padding: 16px 18px; margin-bottom: 12px;
+    border-radius: 10px; background: #1d1d1d; color: #fff; text-decoration: none;
+    border: 1px solid #2c2c2c;
+  }
+  a.card:hover { border-color: #555; }
+  a.card strong { display: block; font-size: 16px; }
+  a.card span { color: #aaa; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>sRGB 色立体ビューア</h1>
+  <p>sRGB 色域を xyY / CIELAB 空間で3D表示します。ドラッグで回転、ホイールでズーム。</p>
+  <a class="card" href="color-solid.html">
+    <strong>点群</strong>
+    <span>RGB立方体のサンプル点を色空間へ配置</span>
+  </a>
+  <a class="card" href="color-solid-mesh.html">
+    <strong>外殻メッシュ</strong>
+    <span>sRGB立方体の6面を写像した色域の境界面</span>
+  </a>
+</main>
+</body>
+</html>

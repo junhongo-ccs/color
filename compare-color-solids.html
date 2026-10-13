@@ -8,7 +8,7 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
   canvas { display: block; touch-action: none; }
   .label {
-    position: fixed; z-index: 20; top: 12px;
+    position: fixed; z-index: 20; top: 56px;
     color: #fff; font: 600 13px system-ui, sans-serif;
     background: rgba(0,0,0,.6); padding: 6px 10px; border-radius: 8px;
     pointer-events: none;
@@ -33,9 +33,33 @@
     border: 0; border-radius: 6px; cursor: pointer;
   }
   #axisLabel { color: #bbb; width: 100%; text-align: center; }
+  /* 共通ヘッダー：一覧へ戻るリンクとページ切替 */
+  #siteHeader {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    height: 44px; box-sizing: border-box; padding: 0 12px;
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(17,17,17,.85); border-bottom: 1px solid #2c2c2c;
+    font: 13px system-ui, sans-serif;
+  }
+  #siteHeader a { color: #bbb; text-decoration: none; white-space: nowrap; }
+  #siteHeader a:hover { color: #fff; }
+  #siteHeader .home { color: #fff; font-weight: 600; }
+  #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; }
+  #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
+  #siteHeader nav a[aria-current="page"] { background: #2c2c2c; color: #fff; }
 </style>
 </head>
 <body class="row">
+
+<header id="siteHeader">
+  <a class="home" href="index.html">← sRGB 色立体</a>
+  <nav>
+    <a href="color-solid.html">点群</a>
+    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="color-solid-marching-cubes.html">Marching Cubes</a>
+    <a href="compare-color-solids.html" aria-current="page">比較</a>
+  </nav>
+</header>
 
 <div id="leftLabel" class="label">外殻メッシュ（立方体の6面を写像）</div>
 <div id="rightLabel" class="label">Marching Cubes</div>

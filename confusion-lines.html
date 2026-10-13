@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Confusion Lines in xyY</title>
+<title>混同色線を立体で見る | xy色度図を立体で見る</title>
+<meta name="description" content="1型・2型・3型の混同色線を xyY 色立体の縦の断面として表示。同じ面に乗る色の見え方を、シミュレーションと並べて確かめられます。" />
+<!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="xy色度図を立体で見る" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:title" content="混同色線を立体で見る | xy色度図を立体で見る" />
+<meta property="og:description" content="1型・2型・3型の混同色線を xyY 色立体の縦の断面として表示。同じ面に乗る色の見え方を、シミュレーションと並べて確かめられます。" />
+<meta property="og:url" content="https://junhongo-ccs.github.io/color/confusion-lines.html" />
+<meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="xy色度図を立体で見る" />
+<meta name="twitter:card" content="summary_large_image" />
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
   canvas#view { display: block; touch-action: none; }
@@ -113,12 +126,12 @@
 <body>
 
 <header id="siteHeader">
-  <a class="home" href="index.html">← sRGB 色立体</a>
+  <a class="home" href="index.html">← HOME</a>
   <nav>
-    <a href="color-solid.html">点群</a>
-    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="color-solid.html">点で見る</a>
+    <a href="color-solid-mesh.html">面で見る</a>
     <a href="confusion-lines.html" aria-current="page">混同色線</a>
-    <a href="hue-slices.html">色相断面</a>
+    <a href="hue-slices.html">等色相面</a>
   </nav>
   <a class="about" href="about.html">説明を見る</a>
 </header>
@@ -131,15 +144,15 @@
   <div role="tabpanel" id="tabView" aria-labelledby="tabBtnView">
   <h2>色覚のタイプ</h2>
   <div class="seg" role="group" aria-label="色覚のタイプ" id="typeButtons">
-    <button data-type="P">P型</button>
-    <button data-type="D">D型</button>
-    <button data-type="T">T型</button>
+    <button data-type="P">1型</button>
+    <button data-type="D">2型</button>
+    <button data-type="T">3型</button>
   </div>
   <div class="ctl-row" id="sliceRow">
     <span class="ctl-label">3Dの断面の色</span>
     <div class="seg" role="group" aria-label="3Dの断面の色" id="sliceSeg">
       <button aria-pressed="true" data-value="actual">一般の見え方</button>
-      <button aria-pressed="false" data-value="sim" id="sliceSegSim">D型の見え方</button>
+      <button aria-pressed="false" data-value="sim" id="sliceSegSim">2型の見え方</button>
     </div>
   </div>
 
@@ -154,7 +167,7 @@
     <canvas class="slice" id="sliceActual" width="384" height="288"></canvas>
   </figure>
   <figure>
-    <figcaption id="simCaption">断面：D型の見え方（シミュレーション）</figcaption>
+    <figcaption id="simCaption">断面：2型の見え方（シミュレーション）</figcaption>
     <canvas class="slice" id="sliceSim" width="384" height="288"></canvas>
     <div class="axis"><span>← 混同色中心の側</span><span>縦：明るさ Y（上が明るい）</span></div>
   </figure>
@@ -177,7 +190,7 @@
   </p>
   <h2>シミュレーションについて</h2>
   <p class="note">
-    見え方のシミュレーションは Viénot ら（1999）の方法による近似です。T型は特に近似の精度が下がります。
+    見え方のシミュレーションは Viénot ら（1999）の方法による近似です。3型は特に近似の精度が下がります。
     色の見え方には個人差があり、実際の見え方をそのまま再現するものではありません。
     <a href="about.html">説明を見る</a>
   </p>
@@ -260,16 +273,16 @@ const WHITE_XY = chromaticity(mul(M, [1, 1, 1]));
 // ============================================================
 // 2. 色覚タイプ
 //
-// 混同色線は、働かない錐体（P型: L、D型: M、T型: S）の方向にだけ違う色を結んだ線。
+// 混同色線は、働かない錐体（1型: L、2型: M、3型: S）の方向にだけ違う色を結んだ線。
 // その錐体軸の色度が混同色中心になり、混同色線はすべてそこを通る。
 // 見え方のシミュレーションは Viénot ら(1999)の方法：
-// 欠けた錐体の値を、白と基準色（P/D: 青、T: 赤）を含む平面上に来るように置き換える。
+// 欠けた錐体の値を、白と基準色（1型・2型: 青、3型: 赤）を含む平面上に来るように置き換える。
 // 錐体軸の方向に沿った射影なので、同じ混同色線上の色は同じ色みに写る。
 // ============================================================
 const TYPES = {
-  P: { k: 0, label: "P型", anchor: [0, 0, 1] },
-  D: { k: 1, label: "D型", anchor: [0, 0, 1] },
-  T: { k: 2, label: "T型", anchor: [1, 0, 0] }
+  P: { k: 0, label: "1型", anchor: [0, 0, 1] },
+  D: { k: 1, label: "2型", anchor: [0, 0, 1] },
+  T: { k: 2, label: "3型", anchor: [1, 0, 0] }
 };
 
 for (const t of Object.values(TYPES)) {
@@ -402,8 +415,6 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.autoRotate = false;
 controls.autoRotateSpeed = 1.2;
-controls.minDistance = 1.5;
-controls.maxDistance = 30;
 
 // --- sRGB 色域の外殻（半透明。color-solid-mesh.html と同じ構成で xyY のみ） ---
 function buildShell(S = 32) {
@@ -480,7 +491,7 @@ const FLOOR_Y = 0.002 / 6; // 底面とちらつかないよう、わずかに�
       toScene(WHITE_XY[0], WHITE_XY[1], 0),
       toScene(WHITE_XY[0], WHITE_XY[1], 1)
     ]),
-    new THREE.LineBasicMaterial({ color: 0x999999 })
+    new THREE.LineBasicMaterial({ color: 0xffffff })
   ));
 }
 
@@ -672,7 +683,7 @@ bindSwitch("toggleShell", (on) => { shell.visible = on; });
 
 bindSwitch("toggleRotate", (on) => { controls.autoRotate = on; });
 
-// 初期表示：D型、白色点（灰色）を通る線 —— 緑と灰色が同じ面に乗る
+// 初期表示：2型、白色点（灰色）を通る線 —— 緑と灰色が同じ面に乗る
 setType("D");
 document.getElementById("throughWhite").click();
 
@@ -681,22 +692,88 @@ document.getElementById("throughWhite").click();
 // ============================================================
 const panel = document.getElementById("panel");
 
-// パネルに隠れない位置に立体が来るよう、投影の中心をずらす
+// 立体を包む球：色域の外殻を基準にし、注視点をその中心に置く
+shell.geometry.computeBoundingBox();
+shell.geometry.boundingBox.getCenter(controls.target);
+const FIT_RADIUS = boundingRadius([shell.geometry.attributes.position.array], controls.target);
+
+// 立体を隠すもの：ヘッダーと、右側（狭い画面では下側）の操作パネル
+function visibleInsets(w, h) {
+  const r = panel.getBoundingClientRect();
+  return w > 760
+    ? { top: 44, right: w - r.left, bottom: 0, left: 0 }
+    : { top: 44, right: 0, bottom: h - r.top, left: 0 };
+}
+
+// ============================================================
+// 立体が画面に収まるカメラ距離と、拡大率のセッション内での記憶
+//
+// ・見える範囲（ヘッダーや操作パネルに隠れない長方形）の中央に立体が来るよう、投影の中心をずらす
+// ・立体を包む球がその範囲にちょうど収まる距離を「等倍」にする（自動回転で向きが変わってもはみ出さない）
+// ・ユーザーが変えた拡大率（等倍に対する比）はページごとに sessionStorage に保存し、
+//   同じタブの中では再読み込みやページの行き来をしても引き継ぐ
+// ============================================================
+const ZOOM_KEY = `zoom:${location.pathname}`;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 4;
+let fitDistance = 1;
+let zoomRatio = (() => {
+  try {
+    const v = Number(sessionStorage.getItem(ZOOM_KEY));
+    return v >= ZOOM_MIN && v <= ZOOM_MAX ? v : 1;
+  } catch {
+    return 1; // 保存領域が使えない環境では毎回等倍から
+  }
+})();
+
+// 注視点から最も遠い点までの距離（立体を包む球の半径）
+function boundingRadius(arrays, center) {
+  let r2 = 0;
+  for (const a of arrays) {
+    for (let i = 0; i < a.length; i += 3) {
+      const dx = a[i] - center.x, dy = a[i + 1] - center.y, dz = a[i + 2] - center.z;
+      r2 = Math.max(r2, dx * dx + dy * dy + dz * dz);
+    }
+  }
+  return Math.sqrt(r2);
+}
+
 function layout() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h);
-  const r = panel.getBoundingClientRect();
-  if (w > 760) {
-    const p = r.width + 12;
-    camera.aspect = (w + p) / h;
-    camera.setViewOffset(w + p, h, p, 0, w, h);
-  } else {
-    const p = Math.min(r.height + 8, h * 0.5);
-    camera.aspect = w / (h + p);
-    camera.setViewOffset(w, h + p, 0, p, w, h);
-  }
+  const inset = visibleInsets(w, h);
+  const vw = Math.max(1, w - inset.left - inset.right);
+  const vh = Math.max(1, h - inset.top - inset.bottom);
+
+  // 見える範囲の中心が画面の中心からずれている分だけ、投影の中心をずらす
+  const dx = (inset.left - inset.right) / 2, dy = (inset.top - inset.bottom) / 2;
+  const fw = w + 2 * Math.abs(dx), fh = h + 2 * Math.abs(dy);
+  camera.aspect = fw / fh;
+  camera.setViewOffset(fw, fh, Math.abs(dx) - dx, Math.abs(dy) - dy, w, h);
   camera.updateProjectionMatrix();
+
+  // 見える範囲の短い辺に、立体を包む球がちょうど収まる距離
+  const tanHalf = (Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.min(vw, vh)) / fh;
+  fitDistance = (FIT_RADIUS / Math.sin(Math.atan(tanHalf))) * 1.04;
+  controls.minDistance = fitDistance * ZOOM_MIN;
+  controls.maxDistance = fitDistance * ZOOM_MAX;
+
+  // 向きはそのままで、距離だけ「等倍 × 記憶している拡大率」にする
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, fitDistance * zoomRatio);
 }
+
+// ズームで距離が変わったら拡大率を記憶する（回転やパンでは距離は変わらない）
+controls.addEventListener("change", () => {
+  const r = camera.position.distanceTo(controls.target) / fitDistance;
+  if (Math.abs(r - zoomRatio) > 1e-3) {
+    zoomRatio = r;
+    try {
+      sessionStorage.setItem(ZOOM_KEY, r.toFixed(4));
+    } catch {
+      // 保存できない環境では、このページを開いている間だけ有効
+    }
+  }
+});
 layout();
 window.addEventListener("resize", layout);
 

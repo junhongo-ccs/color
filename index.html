@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>sRGB Color Solid</title>
+<title>xy色度図を立体で見る</title>
+<meta name="description" content="xy色度図に明るさ（Y）を足すと、画面で出せる色の範囲は立体になります。その色立体を回して眺めながら、色彩検定 UC級で学ぶ混同色線や、等色相面での明るさの違いを確かめられます。" />
+<!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="xy色度図を立体で見る" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:title" content="xy色度図を立体で見る" />
+<meta property="og:description" content="xy色度図に明るさ（Y）を足すと、画面で出せる色の範囲は立体になります。その色立体を回して眺めながら、色彩検定 UC級で学ぶ混同色線や、等色相面での明るさの違いを確かめられます。" />
+<meta property="og:url" content="https://junhongo-ccs.github.io/color/" />
+<meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="xy色度図を立体で見る" />
+<meta name="twitter:card" content="summary_large_image" />
 <style>
   html, body { margin: 0; min-height: 100%; background: #111; color: #eee; }
   body { font: 15px/1.7 system-ui, sans-serif; padding: 48px 16px; }
@@ -23,23 +36,23 @@
 </head>
 <body>
 <main>
-  <h1>sRGB 色立体ビューア</h1>
-  <p>sRGB 色域を xyY / CIELAB 空間で3D表示します。ドラッグで回転、ホイールでズーム。<a href="about.html">説明を見る →</a></p>
+  <h1>xy色度図を立体で見る</h1>
+  <p>xy色度図には明るさの軸がありません。明るさ（Y）を足すと、画面で出せる色の範囲は立体になります。ドラッグで回転、ホイールでズーム。<a href="about.html">説明を見る →</a></p>
   <a class="card" href="color-solid.html">
-    <strong>点群</strong>
-    <span>RGB立方体のサンプル点を色空間へ配置</span>
+    <strong>色度図に明るさを足して見る</strong>
+    <span>画面で出せる色を5,832個の点にして、立体の中まで眺める</span>
   </a>
   <a class="card" href="color-solid-mesh.html">
-    <strong>外殻メッシュ</strong>
-    <span>sRGB立方体の6面を写像した色域の境界面</span>
+    <strong>色度図の立体を面で見る</strong>
+    <span>画面で出せる色の範囲（色域）の外側を、なめらかな面で正確に描く</span>
   </a>
   <a class="card" href="confusion-lines.html">
-    <strong>混同色線（色彩検定 UC級）</strong>
-    <span>P型・D型・T型の混同色線を xyY 立体の縦の断面として表示し、見え方を比べる</span>
+    <strong>混同色線を立体で見る</strong>
+    <span>1型・2型・3型で見分けにくい色が、立体のどこに並ぶかを断面で確かめる</span>
   </a>
   <a class="card" href="hue-slices.html">
-    <strong>色相断面（CIELAB）</strong>
-    <span>色相ごとに切った断面で、最も鮮やかな色の明度が色相によって違うことを確かめる</span>
+    <strong>等色相面を立体で見る</strong>
+    <span>黄は明るく、青は暗いところで最も鮮やかになる。色相ごとの断面で比べる</span>
   </a>
 </main>
 </body>

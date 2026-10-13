@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>sRGB Color Solid</title>
+<title>色度図に明るさを足して見る | xy色度図を立体で見る</title>
+<meta name="description" content="画面で出せる5,832色を点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
+<!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="xy色度図を立体で見る" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:title" content="色度図に明るさを足して見る | xy色度図を立体で見る" />
+<meta property="og:description" content="画面で出せる5,832色を点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
+<meta property="og:url" content="https://junhongo-ccs.github.io/color/color-solid.html" />
+<meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="xy色度図を立体で見る" />
+<meta name="twitter:card" content="summary_large_image" />
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
   canvas { display: block; }
@@ -60,12 +73,12 @@
 <body>
 
 <header id="siteHeader">
-  <a class="home" href="index.html">← sRGB 色立体</a>
+  <a class="home" href="index.html">← HOME</a>
   <nav>
-    <a href="color-solid.html" aria-current="page">点群</a>
-    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="color-solid.html" aria-current="page">点で見る</a>
+    <a href="color-solid-mesh.html">面で見る</a>
     <a href="confusion-lines.html">混同色線</a>
-    <a href="hue-slices.html">色相断面</a>
+    <a href="hue-slices.html">等色相面</a>
   </nav>
   <a class="about" href="about.html">説明を見る</a>
 </header>
@@ -232,7 +245,36 @@ document.body.appendChild(renderer.domElement);
 // ------------------------------------------------------------
 // 4. 補助軸
 // ------------------------------------------------------------
-const axes = new THREE.AxesHelper(2.5);
+// 補助軸（xyY / CIELAB の切替に合わせて一緒に動く）
+//   白：無彩色軸（黒 Y=0 → 白 Y=1）。縦軸の明るさは、この灰色の並びに沿って伸びる
+//   赤：x（xyY）/ a*（CIELAB）が増える向き ＝ 赤の側
+//   青：y（xyY）/ b*（CIELAB）が減る向き ＝ 青の側
+const WHITE_SUM = WHITE_XYZ[0] + WHITE_XYZ[1] + WHITE_XYZ[2];
+const NEUTRAL_BASE = {
+  xyY: [(WHITE_XYZ[0] / WHITE_SUM - 0.33) * 8, -(WHITE_XYZ[1] / WHITE_SUM - 0.33) * 8],
+  CIELAB: [0, 0]
+};
+function axisPositions([bx, bz]) {
+  return new Float32Array([
+    bx, -1.5, bz, bx, 4.5, bz,
+    bx, -1.5, bz, bx + 2.5, -1.5, bz,
+    bx, -1.5, bz, bx, -1.5, bz + 2.5
+  ]);
+}
+for (const name of Object.keys(SPACES)) {
+  SPACES[name].axisLine = axisPositions(NEUTRAL_BASE[name]);
+}
+
+const axisGeometry = new THREE.BufferGeometry();
+const axisAttr = new THREE.BufferAttribute(SPACES.xyY.axisLine.slice(), 3);
+axisGeometry.setAttribute("position", axisAttr);
+axisGeometry.setAttribute("color", new THREE.Float32BufferAttribute([
+  1, 1, 1, 1, 1, 1,
+  1, 0, 0, 1, 0, 0,
+  0, 0, 1, 0, 0, 1
+], 3));
+const axes = new THREE.LineSegments(axisGeometry, new THREE.LineBasicMaterial({ vertexColors: true }));
+axes.frustumCulled = false;
 scene.add(axes);
 scene.add(points);
 
@@ -245,8 +287,90 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.06;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 1.2;
-controls.minDistance = 1.5;
-controls.maxDistance = 15;
+
+// 立体を包む球：xyY と CIELAB のどちらに切り替えてもはみ出さないよう、両方の点を含める
+const FIT_RADIUS = boundingRadius(Object.values(SPACES).map((s) => s.positions), controls.target);
+
+// 立体を隠すもの：ヘッダー。操作パネルが横幅の半分近くを占める狭い画面では、パネルの下から
+const ui = document.getElementById("ui");
+function visibleInsets(w) {
+  const r = ui.getBoundingClientRect();
+  const top = r.width > w * 0.45 ? r.bottom + 8 : 44;
+  return { top, right: 0, bottom: 0, left: 0 };
+}
+
+// ============================================================
+// 立体が画面に収まるカメラ距離と、拡大率のセッション内での記憶
+//
+// ・見える範囲（ヘッダーや操作パネルに隠れない長方形）の中央に立体が来るよう、投影の中心をずらす
+// ・立体を包む球がその範囲にちょうど収まる距離を「等倍」にする（自動回転で向きが変わってもはみ出さない）
+// ・ユーザーが変えた拡大率（等倍に対する比）はページごとに sessionStorage に保存し、
+//   同じタブの中では再読み込みやページの行き来をしても引き継ぐ
+// ============================================================
+const ZOOM_KEY = `zoom:${location.pathname}`;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 4;
+let fitDistance = 1;
+let zoomRatio = (() => {
+  try {
+    const v = Number(sessionStorage.getItem(ZOOM_KEY));
+    return v >= ZOOM_MIN && v <= ZOOM_MAX ? v : 1;
+  } catch {
+    return 1; // 保存領域が使えない環境では毎回等倍から
+  }
+})();
+
+// 注視点から最も遠い点までの距離（立体を包む球の半径）
+function boundingRadius(arrays, center) {
+  let r2 = 0;
+  for (const a of arrays) {
+    for (let i = 0; i < a.length; i += 3) {
+      const dx = a[i] - center.x, dy = a[i + 1] - center.y, dz = a[i + 2] - center.z;
+      r2 = Math.max(r2, dx * dx + dy * dy + dz * dz);
+    }
+  }
+  return Math.sqrt(r2);
+}
+
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  const inset = visibleInsets(w, h);
+  const vw = Math.max(1, w - inset.left - inset.right);
+  const vh = Math.max(1, h - inset.top - inset.bottom);
+
+  // 見える範囲の中心が画面の中心からずれている分だけ、投影の中心をずらす
+  const dx = (inset.left - inset.right) / 2, dy = (inset.top - inset.bottom) / 2;
+  const fw = w + 2 * Math.abs(dx), fh = h + 2 * Math.abs(dy);
+  camera.aspect = fw / fh;
+  camera.setViewOffset(fw, fh, Math.abs(dx) - dx, Math.abs(dy) - dy, w, h);
+  camera.updateProjectionMatrix();
+
+  // 見える範囲の短い辺に、立体を包む球がちょうど収まる距離
+  const tanHalf = (Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.min(vw, vh)) / fh;
+  fitDistance = (FIT_RADIUS / Math.sin(Math.atan(tanHalf))) * 1.04;
+  controls.minDistance = fitDistance * ZOOM_MIN;
+  controls.maxDistance = fitDistance * ZOOM_MAX;
+
+  // 向きはそのままで、距離だけ「等倍 × 記憶している拡大率」にする
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  camera.position.copy(controls.target).addScaledVector(dir, fitDistance * zoomRatio);
+}
+
+// ズームで距離が変わったら拡大率を記憶する（回転やパンでは距離は変わらない）
+controls.addEventListener("change", () => {
+  const r = camera.position.distanceTo(controls.target) / fitDistance;
+  if (Math.abs(r - zoomRatio) > 1e-3) {
+    zoomRatio = r;
+    try {
+      sessionStorage.setItem(ZOOM_KEY, r.toFixed(4));
+    } catch {
+      // 保存できない環境では、このページを開いている間だけ有効
+    }
+  }
+});
+
+layout();
+window.addEventListener("resize", layout);
 
 // ------------------------------------------------------------
 // 6. 色空間の切替（xyY ⇔ CIELAB をモーフィング）
@@ -254,6 +378,7 @@ controls.maxDistance = 15;
 const MORPH_SECONDS = 0.9;
 let currentSpace = "xyY";
 let morphFrom = null; // 切替開始時点の座標
+let axisFrom = null;
 let morphTo = null;
 let morphT = 1;
 
@@ -286,6 +411,7 @@ bindSegment("spaceSeg", (space) => {
   currentSpace = space;
   // 切替途中で押された場合も、今の位置から滑らかに向かう
   morphFrom = positionAttr.array.slice();
+  axisFrom = axisAttr.array.slice();
   morphTo = SPACES[currentSpace].positions;
   morphT = 0;
   axisLabel.textContent = SPACES[currentSpace].axes;
@@ -304,6 +430,11 @@ function updateMorph(dt) {
     arr[i] = morphFrom[i] + (morphTo[i] - morphFrom[i]) * k;
   }
   positionAttr.needsUpdate = true;
+  const axisTo = SPACES[currentSpace].axisLine;
+  for (let i = 0; i < axisTo.length; i++) {
+    axisAttr.array[i] = axisFrom[i] + (axisTo[i] - axisFrom[i]) * k;
+  }
+  axisAttr.needsUpdate = true;
 }
 
 // ------------------------------------------------------------
@@ -326,11 +457,7 @@ bindSwitch("toggleRotate", (on) => { controls.autoRotate = on; });
 // ------------------------------------------------------------
 // 9. リサイズ対応
 // ------------------------------------------------------------
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+// 画面サイズの変更は layout() で対応（立体が収まる距離を計算し直す）
 </script>
 
 </body>

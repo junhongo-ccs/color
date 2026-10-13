@@ -3,7 +3,20 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>sRGB 色立体ビューアについて</title>
+<title>このサイトの見方 | xy色度図を立体で見る</title>
+<meta name="description" content="色立体とは何か、xyY と CIELAB で形が違う理由、混同色線と明るさの関係など、ビューアの見方と仕組みを解説します。" />
+<!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="xy色度図を立体で見る" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:title" content="このサイトの見方 | xy色度図を立体で見る" />
+<meta property="og:description" content="色立体とは何か、xyY と CIELAB で形が違う理由、混同色線と明るさの関係など、ビューアの見方と仕組みを解説します。" />
+<meta property="og:url" content="https://junhongo-ccs.github.io/color/about.html" />
+<meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="xy色度図を立体で見る" />
+<meta name="twitter:card" content="summary_large_image" />
 <style>
   html, body { margin: 0; background: #111; color: #e6e6e6; }
   body { font: 15px/1.85 system-ui, sans-serif; padding: 72px 16px 64px; }
@@ -35,6 +48,40 @@
   th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid #2c2c2c; }
   th { color: #fff; font-weight: 600; white-space: nowrap; }
   td a { white-space: nowrap; }
+  table.compact { min-width: 0; width: auto; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip {
+    display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    vertical-align: -1px; margin-right: 6px; border: 1px solid #555;
+  }
+  ol.points { padding-left: 1.4em; }
+
+  /* 話題ごとのアコーディオン（<details>） */
+  .section-tools { display: flex; justify-content: flex-end; margin: 24px 0 4px; }
+  .section-tools button {
+    font: inherit; font-size: 13px; padding: 4px 12px; border: 1px solid #333;
+    border-radius: 6px; background: #1c1c1c; color: #ddd; cursor: pointer;
+  }
+  .section-tools button:hover { background: #2a2a2a; color: #fff; }
+  details.section { border-top: 1px solid #2c2c2c; scroll-margin-top: 56px; /* 固定ヘッダーに隠れないように */ }
+  details.section:last-of-type { border-bottom: 1px solid #2c2c2c; }
+  details.section > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 4px; cursor: pointer; list-style: none;
+  }
+  details.section > summary::-webkit-details-marker { display: none; }
+  details.section > summary:hover h2 { color: #8ab4ff; }
+  details.section > summary:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; border-radius: 4px; }
+  details.section > summary h2 { margin: 0; padding: 0; border: 0; }
+  /* 開閉の向きを示す矢印（閉じているときは下向き、開いているときは上向き） */
+  details.section > summary::after {
+    content: ""; flex: none; width: 8px; height: 8px; margin-right: 4px;
+    border-right: 2px solid #888; border-bottom: 2px solid #888;
+    transform: rotate(45deg); transition: transform .15s;
+  }
+  details.section[open] > summary::after { transform: rotate(-135deg); }
+  .section-body { padding: 0 4px 28px; }
+  .section-body > h3:first-child { margin-top: 4px; }
 
   /* 共通ヘッダー：一覧へ戻るリンクとページ切替 */
   #siteHeader {
@@ -56,153 +103,374 @@
 <body>
 
 <header id="siteHeader">
-  <a class="home" href="index.html">← sRGB 色立体</a>
+  <a class="home" href="index.html">← HOME</a>
   <nav>
-    <a href="color-solid.html">点群</a>
-    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="color-solid.html">点で見る</a>
+    <a href="color-solid-mesh.html">面で見る</a>
     <a href="confusion-lines.html">混同色線</a>
-    <a href="hue-slices.html">色相断面</a>
+    <a href="hue-slices.html">等色相面</a>
   </nav>
   <a class="about" href="about.html" aria-current="page">説明を見る</a>
 </header>
 
 <main>
-  <h1>sRGB 色立体ビューアについて</h1>
+  <h1>このサイトの見方</h1>
   <p class="lead">
-    パソコンやスマホの画面で表示できる色の範囲を、3次元の立体として回して眺めるためのビューアです。
-    同じ色の範囲を2つの色空間（xyY と CIELAB）で表示し、点群と外殻メッシュの2通りの方法で描いています。
-    また、色彩検定 UC級で学ぶ混同色線や、色相ごとの明度の違いを、立体の上で確かめるページもあります。
+    xy色度図には明るさの軸がありません。そこに明るさ（Y）を足すと、パソコンやスマホの画面で出せる色の範囲は立体になります。
+    このサイトは、その立体を回して眺めるためのものです。同じ色の範囲を2つの色空間（xyY と CIELAB）で表示し、点と面の2通りの方法で描いています。
+    また、色彩検定 UC級で学ぶ混同色線や、等色相面での明度の違いを、立体の上で確かめるページもあります。
   </p>
 
-  <h2>色立体とは</h2>
-  <p>
-    色は3つの数値で表せます。たとえば画面の色は赤・緑・青の光の強さ（RGB）の組み合わせです。
-    3つの数値を座標と見なすと、1つの色は3次元空間の1つの点になり、
-    ある方式で表せる色をすべて集めると1つの立体になります。これが<strong>色立体</strong>です。
-  </p>
-  <p>
-    このビューアが扱うのは <strong>sRGB</strong> の色立体です。sRGB は一般的なモニターや Web の標準の色の規格で、
-    その表示できる色の範囲（<strong>色域</strong>）を立体の形として見ることができます。
-    RGB のままだと単なる立方体ですが、人の色の感じ方に基づく色空間へ移すと、ゆがんだ独特の形が現れます。
-  </p>
+  <div class="section-tools">
+    <button type="button" id="toggleAll">すべて開く</button>
+  </div>
 
-  <h2>2つの色空間</h2>
-
-  <h3>xyY（CIE 1931）</h3>
-  <ul>
-    <li><code>x</code>・<code>y</code> は色み（色度）、<code>Y</code> は明るさ（輝度）を表します。縦軸が <code>Y</code> です。</li>
-    <li>真上から見ると、教科書でおなじみの<strong>色度図の三角形</strong>になります。三角形の3つの角が sRGB の赤・緑・青の原色です。</li>
-    <li>明るくなるほど作れる色みの範囲が狭まり、最後は白の1点に向かって尖ります。</li>
-    <li>空間上の距離は見た目の色の差と一致しません。たとえば緑のあたりは実際の見え方の違い以上に広がって見えます。</li>
-  </ul>
-
-  <div class="aside">
-    <p class="aside-title">色彩検定 UC級の視点から：混同色線と明るさ</p>
+  <details class="section" id="color-solid" open>
+    <summary><h2>色立体とは</h2></summary>
+    <div class="section-body">
     <p>
-      UC級で学ぶ<strong>混同色線</strong>は、xy 色度図、つまりこの立体を真上から見た図の上に引かれる直線です。
-      同じ混同色線の上にある色どうしは、P型・D型などの色覚では色みの違いとしてはほとんど区別できません。
+      色は3つの数値で表せます。たとえば画面の色は赤・緑・青の光の強さ（RGB）の組み合わせです。
+      3つの数値を座標と見なすと、1つの色は3次元空間の1つの点になり、
+      ある方式で表せる色をすべて集めると1つの立体になります。これが<strong>色立体</strong>です。
     </p>
     <p>
-      ただし、色度図には立体の縦軸である明るさ（Y）が表れていません。
-      同じ混同色線上の色でも明るさに差があれば、それを手がかりに区別できることがあります。
-      逆に、混同色線上にあって明るさも近い組み合わせ（たとえば深緑と濃い灰色）は、特に見分けにくくなります。
+      このビューアが扱うのは <strong>sRGB</strong> の色立体です。sRGB は一般的なモニターや Web の標準の色の規格で、
+      その表示できる色の範囲（<strong>色域</strong>）を立体の形として見ることができます。
+      RGB のままだと単なる立方体ですが、人の色の感じ方に基づく色空間へ移すと、ゆがんだ独特の形が現れます。
     </p>
+    </div>
+  </details>
+
+  <details class="section" id="spaces">
+    <summary><h2>2つの色空間</h2></summary>
+    <div class="section-body">
+
+    <h3>xyY（CIE 1931）</h3>
+    <ul>
+      <li><code>x</code>・<code>y</code> は色み（色度）、<code>Y</code> は明るさ（輝度）を表します。縦軸が <code>Y</code> です。</li>
+      <li>真上から見ると、教科書でおなじみの<strong>色度図の三角形</strong>になります。三角形の3つの角が sRGB の赤・緑・青の原色です。</li>
+      <li>明るくなるほど作れる色みの範囲が狭まり、最後は白の1点に向かって尖ります。</li>
+      <li>空間上の距離は見た目の色の差と一致しません。たとえば緑のあたりは実際の見え方の違い以上に広がって見えます。</li>
+    </ul>
+
+    <div class="aside">
+      <p class="aside-title">色彩検定 UC級の視点から：混同色線と明るさ</p>
+      <p>
+        UC級で学ぶ<strong>混同色線</strong>は、xy 色度図、つまりこの立体を真上から見た図の上に引かれる直線です。
+        同じ混同色線の上にある色どうしは、1型・2型などの色覚では色みの違いとしてはほとんど区別できません。
+      </p>
+      <p>
+        ただし、色度図には立体の縦軸である明るさ（Y）が表れていません。
+        同じ混同色線上の色でも明るさに差があれば、それを手がかりに区別できることがあります。
+        逆に、混同色線上にあって明るさも近い組み合わせ（たとえば深緑と濃い灰色）は、特に見分けにくくなります。
+      </p>
+      <p class="note">
+        ここでの Y は一般的な色覚を基準にした明るさです。1型の色覚では赤い光が暗く感じられるため、
+        赤みの強い色は Y の値よりも暗く見えます（赤と黒が見分けにくいのはこのためです）。
+        Y の差だけで見分けやすさを判断できるわけではない点に注意してください。
+      </p>
+      <p>
+        <a href="confusion-lines.html">混同色線のページ</a>では、混同色線を xyY 立体の縦の断面として表示し、
+        その面に乗る色の一般的な見え方と、各タイプの見え方のシミュレーションを並べて比べられます。
+        初期表示の「2型・白色点を通る線」では、深い緑と灰色が同じ面に乗っていることを確かめられます。
+      </p>
+    </div>
+
+    <h3>CIELAB（L*a*b*）</h3>
+    <ul>
+      <li><code>L*</code> は明るさ（明度）、<code>a*</code> は緑↔赤、<code>b*</code> は青↔黄を表します。縦軸が <code>L*</code> です。</li>
+      <li>空間上の距離が<strong>見た目の色の差</strong>にほぼ比例するように作られた色空間です。</li>
+      <li>黒と白は中心の縦軸の下端と上端の1点になり、原色は外側に張り出した角になります。</li>
+      <li>
+        黄色は明るい位置で、青は暗い位置で大きく外へ張り出します。
+        色みによって、最も鮮やかになる明るさが違うことが形から分かります
+        （<a href="hue-slices.html">等色相面のページ</a>で、色相ごとに確かめられます）。
+      </li>
+    </ul>
     <p class="note">
-      ここでの Y は一般的な色覚を基準にした明るさです。P型の色覚では赤い光が暗く感じられるため、
-      赤みの強い色は Y の値よりも暗く見えます（赤と黒が見分けにくいのはこのためです）。
-      Y の差だけで見分けやすさを判断できるわけではない点に注意してください。
+      「点で見る」「面で見る」のページの「xyY ／ CIELAB」の切り替えで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
+    </p>
+    </div>
+  </details>
+
+  <details class="section" id="shape">
+    <summary><h2>xyY と CIELAB で形が違う理由</h2></summary>
+    <div class="section-body">
+    <p>
+      2つの立体の中身は、まったく同じ sRGB の色の集まりです。色が増えたり減ったりしているのではなく、
+      同じ色に<strong>座標の付け方</strong>が違うだけです。それでも形が大きく変わるのは、
+      2つの色空間が「明るさ」と「色み」を違う考え方で測っているからです。
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th></th><th>xyY</th><th>CIELAB</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>縦軸</th><td>輝度 Y：光の量そのもの</td><td>明度 L*：人が感じる明るさ</td></tr>
+          <tr><th>横方向</th><td>色度 x, y：色みの<strong>割合</strong></td><td>a*, b*：白と比べた色みの<strong>量</strong></td></tr>
+          <tr><th>黒の付近</th><td>色度の三角形が広がったまま</td><td>黒の1点にすぼまる</td></tr>
+          <tr><th>白の付近</th><td>白の1点に尖る</td><td>白の1点にすぼまる</td></tr>
+          <tr><th>全体の形</th><td>三角形の底面から白へ尖るテント形</td><td>黒と白を両端にした紡錘形</td></tr>
+          <tr><th>向いている用途</th><td>光の混ぜ合わせ、色度図、混同色線</td><td>色の差の大きさ、色相・明度・彩度の比較</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>1. 縦軸：光の量か、感じる明るさか</h3>
+    <p>
+      Y は目に入る光の量に比例する値で、L* は人が感じる明るさに合わせた値です。
+      人の目は暗いところの差に敏感なので、L* はおおよそ Y の3乗根に比例するように作られています。
+    </p>
+    <div class="table-wrap">
+      <table class="compact">
+        <thead><tr><th class="num">光の量 Y</th><th class="num">感じる明るさ L*</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1%</td><td class="num">9.0</td></tr>
+          <tr><td class="num">5%</td><td class="num">26.7</td></tr>
+          <tr><td class="num">18%</td><td class="num">49.5</td></tr>
+          <tr><td class="num">50%</td><td class="num">76.1</td></tr>
+          <tr><td class="num">100%</td><td class="num">100.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      光の量が白の18%しかない灰色が、感じる明るさではちょうど中間（L* 約50）になります。
+      xyY では立体の下の2割ほどに押し込められていた暗い色が、CIELAB では下半分に広がります。
+      xyY の立体が上の方ばかり大きく見えるのはこのためです。
+    </p>
+
+    <h3>2. 横方向：色みの割合か、色みの量か</h3>
+    <p>
+      色度 x, y は、X, Y, Z をその合計で割った「割合」です。そのため、同じ色を暗くしても値が変わりません。
+      一方、CIELAB の a*, b* は「白と比べてどれだけ色みがあるか」という量なので、暗くなるほど小さくなります。
+      赤を暗くしていくと、次のようになります。
+    </p>
+    <div class="table-wrap">
+      <table class="compact">
+        <thead><tr><th class="num">赤の光の量</th><th>色度 (x, y)</th><th class="num">明度 L*</th><th class="num">彩度 C*</th></tr></thead>
+        <tbody>
+          <tr><td class="num">100%</td><td>(0.640, 0.330)</td><td class="num">53.2</td><td class="num">104.6</td></tr>
+          <tr><td class="num">50%</td><td>(0.640, 0.330)</td><td class="num">39.0</td><td class="num">83.0</td></tr>
+          <tr><td class="num">10%</td><td>(0.640, 0.330)</td><td class="num">16.1</td><td class="num">44.8</td></tr>
+          <tr><td class="num">2%</td><td>(0.640, 0.330)</td><td class="num">3.8</td><td class="num">18.3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      xyY では、暗い色も色度の三角形いっぱいに広がったまま底に並ぶので、底面が三角形になります。
+      CIELAB では暗い色ほど彩度が小さくなり、最後はすべて黒の1点に集まります。
+      暗い赤は実際に赤みが弱く見えるので、この点では CIELAB の形の方が見た目の感覚に近いと言えます。
+    </p>
+
+    <h3>3. 白の付近：どちらも1点にすぼまる</h3>
+    <p>
+      明るい色を出すには、3つの原色をどれも強く光らせる必要があり、色みが混ざって白に近づきます。
+      そのため、どちらの空間でも上にいくほど細くなり、白の1点で終わります。ここは2つの空間で共通です。
+    </p>
+
+    <h3>4. 原色と2次色の高さ</h3>
+    <div class="table-wrap">
+      <table class="compact">
+        <thead><tr><th>色</th><th class="num">光の量 Y</th><th class="num">明度 L*</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip" style="background:#ff0000"></span>赤</td><td class="num">21%</td><td class="num">53.2</td></tr>
+          <tr><td><span class="chip" style="background:#00ff00"></span>緑</td><td class="num">72%</td><td class="num">87.7</td></tr>
+          <tr><td><span class="chip" style="background:#0000ff"></span>青</td><td class="num">7%</td><td class="num">32.3</td></tr>
+          <tr><td><span class="chip" style="background:#ffff00"></span>黄</td><td class="num">93%</td><td class="num">97.1</td></tr>
+          <tr><td><span class="chip" style="background:#00ffff"></span>シアン</td><td class="num">79%</td><td class="num">91.1</td></tr>
+          <tr><td><span class="chip" style="background:#ff00ff"></span>マゼンタ</td><td class="num">28%</td><td class="num">60.3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      青は光の量では白の7%しかないので、xyY では底すれすれに張り付いています。
+      ところが感じる明るさでは L* 32 あり、CIELAB では立体の下から3分の1ほどの高さまで持ち上がります。
+      黄・シアン・緑は、どちらの空間でも上の方にあります。
+      <a href="hue-slices.html">等色相面のページ</a>で見られる「色相ごとに最も鮮やかになる明るさが違う」という性質は、
+      この表の L* の違いそのものです。
     </p>
     <p>
-      <a href="confusion-lines.html">混同色線のページ</a>では、混同色線を xyY 立体の縦の断面として表示し、
-      その面に乗る色の一般的な見え方と、各タイプの見え方のシミュレーションを並べて比べられます。
-      初期表示の「D型・白色点を通る線」では、深い緑と灰色が同じ面に乗っていることを確かめられます。
+      青の数字は、2つの段階に分けて読むと分かりやすくなります。
+      まず、人の目は青い光の明るさに鈍いので、光の量 Y は白の7%しかありません。
+      次に、感じる明るさは光の量ほどは減らないので、L* では32（白の約3分の1）になります。
+      2つ目の段階は青に限った話ではなく、Y が7%の灰色も同じ L* 32 です。
     </p>
-  </div>
 
-  <h3>CIELAB（L*a*b*）</h3>
-  <ul>
-    <li><code>L*</code> は明るさ（明度）、<code>a*</code> は緑↔赤、<code>b*</code> は青↔黄を表します。縦軸が <code>L*</code> です。</li>
-    <li>空間上の距離が<strong>見た目の色の差</strong>にほぼ比例するように作られた色空間です。</li>
-    <li>黒と白は中心の縦軸の下端と上端の1点になり、原色は外側に張り出した角になります。</li>
-    <li>
-      黄色は明るい位置で、青は暗い位置で大きく外へ張り出します。
-      色みによって、最も鮮やかになる明るさが違うことが形から分かります
-      （<a href="hue-slices.html">色相断面のページ</a>で、色相ごとに確かめられます）。
-    </li>
-  </ul>
-  <p class="note">
-    点群と外殻メッシュのページの「xyY ／ CIELAB」の切り替えで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
-  </p>
+    <div class="aside">
+      <p class="aside-title">用語メモ：ヘルムホルツ・コールラウシュ効果</p>
+      <p>
+        明るさ（輝度）が同じでも、<strong>彩度の高い色ほど明るく見える</strong>現象です。
+        青・紫・赤で強く現れ、黄では弱く現れます。
+      </p>
+      <p>
+        CIELAB の L* は光の量 Y だけから計算するので、この効果は含まれていません。
+        そのため、鮮やかな青は実際には L* 32 の灰色より明るく見えます。
+        「青は案外暗くない」という感覚は、CIELAB の数値で見るよりも、実際の見え方のほうがさらに強くなります。
+      </p>
+    </div>
 
-  <h2>各ページの内容</h2>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr><th>ページ</th><th>作り方</th><th>見どころ</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><a href="color-solid.html">点群</a></td>
-          <td>RGB の各チャンネルを18段階に分けた5,832色を、それぞれ点として配置します。</td>
-          <td>立体の内側まで色が詰まっている様子が見えます。点の間隔の偏りから、空間のゆがみ方も分かります。</td>
-        </tr>
-        <tr>
-          <td><a href="color-solid-mesh.html">外殻メッシュ</a></td>
-          <td>RGB 立方体の6つの面を、そのまま色空間へ写した面です。</td>
-          <td>色域の境界を正確に表します。各面の色は、その位置で表せる最も外側の色です。</td>
-        </tr>
-        <tr>
-          <td><a href="confusion-lines.html">混同色線</a></td>
-          <td>xyY 立体に、P型・D型・T型の混同色線を含む縦の面を重ねます。</td>
-          <td>同じ面に乗る色が、そのタイプの色覚では明るさの違いでしか区別しにくいことを、断面の色とシミュレーションで確かめられます。</td>
-        </tr>
-        <tr>
-          <td><a href="hue-slices.html">色相断面</a></td>
-          <td>CIELAB の立体を、色相 h とその反対側 h+180° を含む縦の面で切ります。</td>
-          <td>断面の頂点（その色相で最も鮮やかな色）の高さが色相ごとに違い、黄は明るく青は暗いところで最も鮮やかになることが分かります。</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+    <h3>5. 距離の意味：見た目の差と合っているか</h3>
+    <p>
+      人が見分けられる最小の色の違い（マクアダムの楕円）を xy 色度図に描くと、
+      緑の付近では大きく、青の付近では小さくなります。
+      つまり、色度図の上で同じ距離だけ離れていても、緑どうしの差は小さく、青どうしの差は大きく見えます。
+      xyY の距離は、見た目の差を測るのには向いていません。
+    </p>
+    <p>
+      CIELAB は、この偏りをできるだけなくすように作られた色空間で、2色の距離が色の差（色差 ΔE*ab）として使われます。
+      ただし完全に均等ではなく、特に青の付近にずれが残るため、より精密な色差の式（CIEDE2000 など）も使われています。
+    </p>
 
-  <h2>しくみ</h2>
+    <h3>6. どちらを使えばよいか</h3>
+    <ul>
+      <li>
+        <strong>xyY</strong>：光の混ぜ合わせ（加法混色）を考えるとき。xy 色度図では、2つの光を混ぜた色は2点を結ぶ<strong>直線の上</strong>に来ます。
+        モニターの色域が三角形になるのも、混同色線が直線として引けるのも、この性質のおかげです。
+        UC級で混同色線を xy 色度図の上で学ぶのはこのためで、CIELAB の上では混同色線は曲がった線になります。
+      </li>
+      <li>
+        <strong>CIELAB</strong>：色の差の大きさを比べるときや、色相・明度・彩度で色を整理するとき。
+        軸の考え方がマンセル表色系に近く、見た目の感覚と結びつけやすい空間です。
+      </li>
+    </ul>
 
-  <h3>外殻メッシュ：立方体の面がそのまま境界になる</h3>
-  <p>
-    RGB の値を CIE XYZ に変換する計算は、行列をかけるだけの線形な変換で、別々の色が同じ点に重なることはありません。
-    そのため、<strong>RGB 立方体の表面がそのまま色域の境界</strong>になります。
-  </p>
-  <ul>
-    <li><code>R=1</code>・<code>G=1</code>・<code>B=1</code> の3面は、それぞれの色みで出せる<strong>最も明るい色</strong>からなる上側の面です。</li>
-    <li><code>R=0</code>・<code>G=0</code>・<code>B=0</code> の3面は、xyY では色度図の三角形の辺に沿って立つ垂直な壁になります（2つの原色を混ぜただけの色は、色度図上で2つの原色を結ぶ線の上に乗るため）。</li>
-    <li>黒の1点は、xyY では明るさ0の底面（三角形）全体に広がり、CIELAB では1点のままです。</li>
-  </ul>
+    <div class="aside">
+      <p class="aside-title">ビューアで確かめるポイント</p>
+      <p>
+        <a href="color-solid-mesh.html">「面で見る」のページ</a>で「xyY ／ CIELAB」を切り替えながら、次の3点を見てください。
+      </p>
+      <ol class="points">
+        <li>底面の三角形が、黒の1点に縮んでいく（横方向の測り方の違い）</li>
+        <li>暗めの色が大きく上へ移動し、青が底から持ち上がる（縦軸の違い）</li>
+        <li>白の頂点は、どちらでも1点のまま変わらない（共通点）</li>
+      </ol>
+    </div>
+    </div>
+  </details>
 
-  <h2>操作方法</h2>
-  <ul>
-    <li><strong>ドラッグ</strong>：回転</li>
-    <li><strong>ホイール／ピンチ</strong>：ズーム</li>
-    <li><strong>右ドラッグ／2本指ドラッグ</strong>：平行移動</li>
-    <li><strong>xyY ／ CIELAB</strong>（点群・外殻メッシュ）：色空間を切り替え。選ばれている方が白く表示されます</li>
-    <li><strong>ワイヤーフレーム</strong>（外殻メッシュ）：面を作っている三角形の網目を表示</li>
-    <li><strong>自動回転</strong>：ゆっくり回し続けるかどうか</li>
-    <li>ON/OFF の項目はスイッチで表しています。つまみが右で青いときが ON です</li>
-  </ul>
+  <details class="section" id="pages">
+    <summary><h2>各ページの内容</h2></summary>
+    <div class="section-body">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>ページ</th><th>作り方</th><th>見どころ</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><a href="color-solid.html">色度図に明るさを足して見る</a></td>
+            <td>RGB の各チャンネルを18段階に分けた5,832色を、それぞれ点として配置します。</td>
+            <td>立体の内側まで色が詰まっている様子が見えます。点の間隔の偏りから、空間のゆがみ方も分かります。</td>
+          </tr>
+          <tr>
+            <td><a href="color-solid-mesh.html">色度図の立体を面で見る</a></td>
+            <td>RGB 立方体の6つの面を、そのまま色空間へ写した面です。</td>
+            <td>色域の境界を正確に表します。各面の色は、その位置で表せる最も外側の色です。</td>
+          </tr>
+          <tr>
+            <td><a href="confusion-lines.html">混同色線を立体で見る</a></td>
+            <td>xyY 立体に、1型・2型・3型の混同色線を含む縦の面を重ねます。</td>
+            <td>同じ面に乗る色が、そのタイプの色覚では明るさの違いでしか区別しにくいことを、断面の色とシミュレーションで確かめられます。</td>
+          </tr>
+          <tr>
+            <td><a href="hue-slices.html">等色相面を立体で見る</a></td>
+            <td>CIELAB の立体を、色相 h とその反対側 h+180° を含む縦の面（等色相面）で切ります。</td>
+            <td>断面の頂点（その色相で最も鮮やかな色）の高さが色相ごとに違い、黄は明るく青は暗いところで最も鮮やかになることが分かります。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
 
-  <h2>表示についての注意</h2>
-  <ul>
-    <li>点や面の色は、その位置が表す sRGB の色そのものです（光による陰影はつけていません）。</li>
-    <li>見やすさのため軸ごとに拡大率を調整しているので、xyY と CIELAB の立体の大きさをそのまま比べることはできません。</li>
-    <li>白色点は D65、sRGB の変換式は IEC 61966-2-1 に従っています。</li>
-    <li>表示されるのはお使いの画面で再現できる色です。広い色域のモニターで見ても、ここで描いているのは sRGB の範囲です。</li>
-  </ul>
+  <details class="section" id="mechanism">
+    <summary><h2>しくみ</h2></summary>
+    <div class="section-body">
 
-  <h2>技術情報</h2>
-  <p>
-    <a href="https://threejs.org/">Three.js</a>（r169）で描画し、色の変換やメッシュの生成はすべてブラウザ内で計算しています。
-    ソースコードは <a href="https://github.com/junhongo-ccs/color">GitHub</a> で公開しています。
-  </p>
+    <h3>面で見る：立方体の面がそのまま境界になる</h3>
+    <p>
+      RGB の値を CIE XYZ に変換する計算は、行列をかけるだけの線形な変換で、別々の色が同じ点に重なることはありません。
+      そのため、<strong>RGB 立方体の表面がそのまま色域の境界</strong>になります。
+    </p>
+    <ul>
+      <li><code>R=1</code>・<code>G=1</code>・<code>B=1</code> の3面は、それぞれの色みで出せる<strong>最も明るい色</strong>からなる上側の面です。</li>
+      <li><code>R=0</code>・<code>G=0</code>・<code>B=0</code> の3面は、xyY では色度図の三角形の辺に沿って立つ垂直な壁になります（2つの原色を混ぜただけの色は、色度図上で2つの原色を結ぶ線の上に乗るため）。</li>
+      <li>黒の1点は、xyY では明るさ0の底面（三角形）全体に広がり、CIELAB では1点のままです。</li>
+    </ul>
+    </div>
+  </details>
+
+  <details class="section" id="controls">
+    <summary><h2>操作方法</h2></summary>
+    <div class="section-body">
+    <ul>
+      <li><strong>ドラッグ</strong>：回転</li>
+      <li><strong>ホイール／ピンチ</strong>：ズーム</li>
+      <li><strong>右ドラッグ／2本指ドラッグ</strong>：平行移動</li>
+      <li><strong>xyY ／ CIELAB</strong>（点で見る・面で見る）：色空間を切り替え。選ばれている方が白く表示されます</li>
+      <li><strong>ワイヤーフレーム</strong>（面で見る）：面を作っている三角形の網目を表示</li>
+      <li><strong>自動回転</strong>：ゆっくり回し続けるかどうか</li>
+      <li>ON/OFF の項目はスイッチで表しています。つまみが右で青いときが ON です</li>
+    </ul>
+    </div>
+  </details>
+
+  <details class="section" id="notes">
+    <summary><h2>表示についての注意</h2></summary>
+    <div class="section-body">
+    <ul>
+      <li>点や面の色は、その位置が表す sRGB の色そのものです（光による陰影はつけていません）。</li>
+      <li>
+        白い縦線は<strong>無彩色軸</strong>（下端が黒、上端が白）です。明るさの軸は、この灰色の並びに沿って伸びています。
+        「点で見る」「面で見る」の底にある赤と青の短い線は、それぞれ赤の側と青の側の向きを表します。
+      </li>
+      <li>見やすさのため軸ごとに拡大率を調整しているので、xyY と CIELAB の立体の大きさをそのまま比べることはできません。</li>
+      <li>白色点は D65、sRGB の変換式は IEC 61966-2-1 に従っています。</li>
+      <li>表示されるのはお使いの画面で再現できる色です。広い色域のモニターで見ても、ここで描いているのは sRGB の範囲です。</li>
+    </ul>
+    </div>
+  </details>
+
+  <details class="section" id="tech">
+    <summary><h2>技術情報</h2></summary>
+    <div class="section-body">
+    <p>
+      <a href="https://threejs.org/">Three.js</a>（r169）で描画し、色の変換やメッシュの生成はすべてブラウザ内で計算しています。
+      ソースコードは <a href="https://github.com/junhongo-ccs/color">GitHub</a> で <a href="https://github.com/junhongo-ccs/color/blob/main/LICENSE">MIT License</a> として公開しています。学習や授業の教材として自由に使えます。
+    </p>
+    </div>
+  </details>
 </main>
+
+<script>
+  // 話題のアコーディオン
+  const sections = [...document.querySelectorAll("details.section")];
+  const toggleAll = document.getElementById("toggleAll");
+
+  // 1つでも閉じていれば「すべて開く」、すべて開いていれば「すべて閉じる」
+  function updateToggleLabel() {
+    const allOpen = sections.every((d) => d.open);
+    toggleAll.textContent = allOpen ? "すべて閉じる" : "すべて開く";
+  }
+  toggleAll.addEventListener("click", () => {
+    const open = !sections.every((d) => d.open);
+    for (const d of sections) d.open = open;
+  });
+  for (const d of sections) d.addEventListener("toggle", updateToggleLabel);
+
+  // URL の # で指定された項目を開いて、そこまでスクロールする
+  function openFromHash() {
+    const target = location.hash && document.getElementById(location.hash.slice(1));
+    if (target && target.matches("details.section")) {
+      target.open = true;
+      target.scrollIntoView();
+    }
+  }
+  window.addEventListener("hashchange", openFromHash);
+  openFromHash();
+  updateToggleLabel();
+</script>
 
 </body>
 </html>

@@ -44,6 +44,17 @@ Three.js を CDN（jsDelivr）から読み込むため、インターネット�
 - **見え方のシミュレーション**：Viénot ら（1999）の方法による近似です。3型は特に精度が下がります。色の見え方には個人差があり、実際の見え方をそのまま再現するものではありません。
 - **等色相面の頂点**：各色相で最も鮮やかな色は、RGB 立方体の「1チャンネルが1・1チャンネルが0」の辺の上にあるので、その辺をたどって求めています
 
+## データの出典とライセンス
+
+xy色度図のスペクトル軌跡（馬蹄形の線）には、CIE が公開しているデータを使っています。
+
+- 出典：CIE (2019). *CIE 1931 chromaticity coordinates of spectrum loci, 2 degree observer.* International Commission on Illumination (CIE), Vienna, Austria. DOI: [10.25039/CIE.DS.mifmy4x4](https://doi.org/10.25039/CIE.DS.mifmy4x4)（CIE 018:2019, Table 6）
+- ライセンス：[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)
+- 変更点：原データ（360〜830 nm、1 nm 刻み）から 380〜780 nm を 5 nm 刻みで抜き出し、JavaScript の配列にしました（値は変えていません）
+
+このデータは [data/cie1931-spectral-locus.js](data/cie1931-spectral-locus.js) にまとめており、このファイルは CC BY-SA 4.0 で提供します。
+リポジトリのほかのファイルには、このライセンスは適用されません。
+
 ## OGP 画像
 
 `ogp.png`（1200×630）は仮の単色画像です。同じファイル名・同じサイズの画像で上書きすると、全ページの OGP 画像が差し替わります。

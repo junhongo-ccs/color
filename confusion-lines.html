@@ -17,6 +17,8 @@
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="xy色度図を立体で見る" />
 <meta name="twitter:card" content="summary_large_image" />
+<!-- Material Symbols（説明ページへのリンクのアイコン。menu_book の1つだけを読み込む） -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=menu_book&display=block" />
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
   canvas#view { display: block; touch-action: none; }
@@ -120,7 +122,11 @@
   #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
   #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
   #siteHeader a[aria-current="page"] { background: #2c2c2c; color: #fff; }
-  #siteHeader .about { margin-left: auto; padding: 4px 10px; border-radius: 6px; }
+  #siteHeader .about {
+    margin-left: auto; padding: 4px 10px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .material-symbols-outlined { font-size: 18px; line-height: 1; }
 </style>
 </head>
 <body>
@@ -133,7 +139,7 @@
     <a href="confusion-lines.html" aria-current="page">混同色線</a>
     <a href="hue-slices.html">等色相面</a>
   </nav>
-  <a class="about" href="about.html">説明を見る</a>
+  <a class="about" href="about.html"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>説明を見る</a>
 </header>
 
 <aside id="panel">
@@ -209,6 +215,8 @@
 <script type="module">
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+// スペクトル軌跡のデータ（CIE、CC BY-SA 4.0。出典はデータファイルの先頭を参照）
+import { SPECTRAL_LOCUS } from "./data/cie1931-spectral-locus.js";
 
 // ============================================================
 // 1. 色変換
@@ -494,6 +502,26 @@ const FLOOR_Y = 0.002 / 6; // 底面とちらつかないよう、わずかに�
     new THREE.LineBasicMaterial({ color: 0xffffff })
   ));
 }
+
+// スペクトル軌跡（単色光の色度を結んだ馬蹄形の線）と、純紫軌跡（両端の 380 nm と 780 nm を結ぶ線）。
+// 人が見られるすべての色は、この2本で囲まれた範囲に入る。sRGB の三角形はその内側の一部
+function makeLocus(toPoint) {
+  const group = new THREE.Group();
+  const points = SPECTRAL_LOCUS.map(([, x, y]) => toPoint(x, y));
+  const spectral = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points),
+    new THREE.LineBasicMaterial({ color: 0xd0d0d0, transparent: true })
+  );
+  // 純紫軌跡は単色光ではないので、破線で区別する
+  const purple = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([points[points.length - 1], points[0]]),
+    new THREE.LineDashedMaterial({ color: 0x9a9a9a, dashSize: 0.14, gapSize: 0.1, transparent: true })
+  );
+  purple.computeLineDistances();
+  group.add(spectral, purple);
+  return group;
+}
+scene.add(makeLocus((x, y) => toScene(x, y, FLOOR_Y)));
 
 // --- 混同色線の束 ---
 const FAN_COUNT = 15;

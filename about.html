@@ -17,6 +17,8 @@
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="xy色度図を立体で見る" />
 <meta name="twitter:card" content="summary_large_image" />
+<!-- Material Symbols（説明ページへのリンクのアイコン。menu_book の1つだけを読み込む） -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=menu_book&display=block" />
 <style>
   html, body { margin: 0; background: #111; color: #e6e6e6; }
   body { font: 15px/1.85 system-ui, sans-serif; padding: 72px 16px 64px; }
@@ -97,7 +99,11 @@
   #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
   #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
   #siteHeader a[aria-current="page"] { background: #2c2c2c; color: #fff; }
-  #siteHeader .about { margin-left: auto; padding: 4px 10px; border-radius: 6px; }
+  #siteHeader .about {
+    margin-left: auto; padding: 4px 10px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .material-symbols-outlined { font-size: 18px; line-height: 1; }
 </style>
 </head>
 <body>
@@ -110,7 +116,7 @@
     <a href="confusion-lines.html">混同色線</a>
     <a href="hue-slices.html">等色相面</a>
   </nav>
-  <a class="about" href="about.html" aria-current="page">説明を見る</a>
+  <a class="about" href="about.html" aria-current="page"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>説明を見る</a>
 </header>
 
 <main>
@@ -190,6 +196,64 @@
     <p class="note">
       「点で見る」「面で見る」のページの「xyY ／ CIELAB」の切り替えで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
     </p>
+    </div>
+  </details>
+
+  <details class="section" id="gamut">
+    <summary><h2>馬蹄形と三角形：画面で出せる色の限界</h2></summary>
+    <div class="section-body">
+      <p>
+        xyY の底にある馬蹄形の線は<strong>スペクトル軌跡</strong>（単色光の色度を結んだ線）、両端を結ぶ破線は<strong>純紫軌跡</strong>です。
+        人が見られるすべての色は、この2本で囲まれた範囲に入ります。
+      </p>
+      <p>
+        馬蹄形の内側で、色のついた三角形の外にある部分は、<strong>人には見えるけれど、sRGB の画面では出せない色</strong>です。
+        三角形は、画面で出せる色の限界を表しています。
+      </p>
+
+      <h3>なぜ三角形になるのか</h3>
+      <p>
+        画面の色は、赤・緑・青の3つの光（原色）を混ぜて作ります。
+        xy色度図では、光を混ぜた色は元の色どうしを結ぶ直線の上に来るので、
+        3色を混ぜて作れる色は、3つの原色を頂点とする三角形の内側に限られます。
+        三角形の頂点の位置は、規格によって決まっています。
+      </p>
+
+      <h3>ほかの規格との比較</h3>
+      <p>
+        もっと広い色域の規格では、三角形が大きくなります。
+        xy色度図の上での三角形の面積を、馬蹄形の面積と比べると次のとおりです。
+      </p>
+      <div class="table-wrap">
+        <table class="compact">
+          <thead><tr><th>規格</th><th>主な用途</th><th class="num">馬蹄形に対する面積</th></tr></thead>
+          <tbody>
+            <tr><td>sRGB</td><td>一般的なモニター、Web（このサイト）</td><td class="num">33.6%</td></tr>
+            <tr><td>Display P3</td><td>最近のスマホやパソコンの画面</td><td class="num">45.6%</td></tr>
+            <tr><td>Adobe RGB</td><td>写真・印刷用のモニター</td><td class="num">45.3%</td></tr>
+            <tr><td>BT.2020</td><td>4K・8K 放送</td><td class="num">63.6%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">
+        この割合は、xy色度図の上の面積で比べたものです。見た目の差がより均等になるように作られた別の色度図（u'v' 色度図）で比べると、数字は変わります。
+      </p>
+
+      <h3>3原色ではどうしても届かない</h3>
+      <p>
+        馬蹄形は外側にふくらんだ曲線なので、どの3点を頂点に選んでも、三角形では全体を覆えません。
+        BT.2020 は原色をスペクトル軌跡の上の単色光に置いていますが、それでも約3分の2です。
+        特に大きく欠けるのは、左上の青緑〜緑（500〜520 nm 付近）です。とても鮮やかなエメラルドのような色は、どの画面でも出せません。
+      </p>
+
+      <div class="aside">
+        <p class="aside-title">テキストの色度図の色についての注意</p>
+        <p>
+          色彩検定のテキストなどでは、馬蹄形全体が色で塗られた色度図がよく使われます。
+          しかし三角形の外側の色は、印刷でも画面でも本当の色は出せないので、近い色で代わりに塗られています。
+          このサイトで三角形の外側を塗らずに線だけにしているのは、出せる色と出せない色の区別をはっきりさせるためです。
+        </p>
+      </div>
     </div>
   </details>
 
@@ -425,6 +489,9 @@
         白い縦線は<strong>無彩色軸</strong>（下端が黒、上端が白）です。明るさの軸は、この灰色の並びに沿って伸びています。
         「点で見る」「面で見る」の底にある赤と青の短い線は、それぞれ赤の側と青の側の向きを表します。
       </li>
+      <li>
+        xyY の底にある馬蹄形の実線はスペクトル軌跡、破線は純紫軌跡です（<a href="#gamut">馬蹄形と三角形</a>を参照）。
+      </li>
       <li>見やすさのため軸ごとに拡大率を調整しているので、xyY と CIELAB の立体の大きさをそのまま比べることはできません。</li>
       <li>白色点は D65、sRGB の変換式は IEC 61966-2-1 に従っています。</li>
       <li>表示されるのはお使いの画面で再現できる色です。広い色域のモニターで見ても、ここで描いているのは sRGB の範囲です。</li>
@@ -438,6 +505,11 @@
     <p>
       <a href="https://threejs.org/">Three.js</a>（r169）で描画し、色の変換やメッシュの生成はすべてブラウザ内で計算しています。
       ソースコードは <a href="https://github.com/junhongo-ccs/color">GitHub</a> で公開しています。
+      </p>
+      <p>
+        スペクトル軌跡のデータ：CIE (2019) <a href="https://doi.org/10.25039/CIE.DS.mifmy4x4">CIE 1931 chromaticity coordinates of spectrum loci, 2 degree observer</a>（<a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ja">CC BY-SA 4.0</a>）。
+        原データ（360〜830 nm、1 nm 刻み）から 380〜780 nm を 5 nm 刻みで抜き出して使っています。
+        このデータのファイル（<code>data/cie1931-spectral-locus.js</code>）は CC BY-SA 4.0 で提供しています。
     </p>
     </div>
   </details>

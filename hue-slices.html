@@ -17,6 +17,8 @@
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="xy色度図を立体で見る" />
 <meta name="twitter:card" content="summary_large_image" />
+<!-- Material Symbols（説明ページへのリンクのアイコン。menu_book の1つだけを読み込む） -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=menu_book&display=block" />
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
   canvas#view { display: block; touch-action: none; }
@@ -120,7 +122,11 @@
   #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
   #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
   #siteHeader a[aria-current="page"] { background: #2c2c2c; color: #fff; }
-  #siteHeader .about { margin-left: auto; padding: 4px 10px; border-radius: 6px; }
+  #siteHeader .about {
+    margin-left: auto; padding: 4px 10px; border-radius: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .material-symbols-outlined { font-size: 18px; line-height: 1; }
 </style>
 </head>
 <body>
@@ -133,7 +139,7 @@
     <a href="confusion-lines.html">混同色線</a>
     <a href="hue-slices.html" aria-current="page">等色相面</a>
   </nav>
-  <a class="about" href="about.html">説明を見る</a>
+  <a class="about" href="about.html"><span class="material-symbols-outlined" aria-hidden="true">menu_book</span>説明を見る</a>
 </header>
 
 <aside id="panel">

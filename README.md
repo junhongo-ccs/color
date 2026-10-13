@@ -55,6 +55,11 @@ xy色度図のスペクトル軌跡（馬蹄形の線）には、CIE が公開�
 このデータは [data/cie1931-spectral-locus.js](data/cie1931-spectral-locus.js) にまとめており、このファイルは CC BY-SA 4.0 で提供します。
 リポジトリのほかのファイルには、このライセンスは適用されません。
 
+### アイコン
+
+ファビコン（`favicon.png`）と「説明を見る」のアイコンには、Google の [Material Symbols](https://fonts.google.com/icons)（[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)）を使っています。
+ファビコンは `deployed_code`（塗りつぶし）の形に、色相が一周するグラデーションを付けて作りました。
+
 ## OGP 画像
 
 `ogp.png`（1200×630）は仮の単色画像です。同じファイル名・同じサイズの画像で上書きすると、全ページの OGP 画像が差し替わります。

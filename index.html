@@ -321,26 +321,40 @@ function makeLocus(toPoint) {
 
 scene.add(makeLocus((x, y) => toLocal(x, y, 0).setY(-0.005)));
 
-// 主な波長の数字（白色点から外側へ少し離して置く）
-function makeWavelengthLabel(nm, x, y) {
+// 波長の数字（白色点から外側へ少し離して置く）。
+// テキストの色度図と同じく可視光の範囲 380〜780 nm を示す。両端は波長が変わっても色度がほとんど
+// 変わらず1点に集まるので、「380〜410」「680〜780」とまとめて1つの数字にする
+function makeWavelengthLabel(text, x, y) {
   const c = document.createElement("canvas");
-  c.width = 128; c.height = 64;
   const ctx = c.getContext("2d");
+  const font = "40px 'BIZ UDPGothic', system-ui, sans-serif";
+  ctx.font = font;
+  c.width = Math.ceil(ctx.measureText(text).width) + 16;
+  c.height = 64;
+  ctx.font = font; // キャンバスの大きさを変えると設定が消えるので、もう一度指定する
   ctx.fillStyle = "#a8a8a8";
-  ctx.font = "40px 'BIZ UDPGothic', system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(String(nm), 64, 32);
+  ctx.fillText(text, c.width / 2, 32);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sprite.scale.set(0.56, 0.28, 1);
-  const out = new THREE.Vector2(x - WHITE_XY[0], y - WHITE_XY[1]).normalize().multiplyScalar(0.045);
+  sprite.scale.set((0.28 * c.width) / c.height, 0.28, 1);
+  // 横に長い数字ほど、線から離して置く
+  const gap = 0.035 + 0.008 * text.length;
+  const out = new THREE.Vector2(x - WHITE_XY[0], y - WHITE_XY[1]).normalize().multiplyScalar(gap);
   sprite.position.copy(toLocal(x + out.x, y + out.y, 0));
   scene.add(sprite);
 }
-for (const [nm, x, y] of SPECTRAL_LOCUS) {
-  if ([460, 480, 500, 520, 540, 560, 580, 600, 620].includes(nm)) makeWavelengthLabel(nm, x, y);
+const locusAt = (nm) => SPECTRAL_LOCUS.find(([w]) => w === nm);
+const WAVELENGTH_LABELS = [
+  ["380〜410", 395],
+  ...[460, 480, 500, 520, 540, 560, 580, 600, 620].map((nm) => [String(nm), nm]),
+  ["680〜780", 730]
+];
+for (const [text, nm] of WAVELENGTH_LABELS) {
+  const [, x, y] = locusAt(nm);
+  makeWavelengthLabel(text, x, y);
 }
 
 // 軸の名前（x・y は床、Y は立ち上がる軸の先端）

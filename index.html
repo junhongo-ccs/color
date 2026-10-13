@@ -17,43 +17,442 @@
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="xy色度図を立体で見る" />
 <meta name="twitter:card" content="summary_large_image" />
+<!-- ユニバーサルデザイン書体（モリサワ BIZ UDPゴシック） -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet" />
 <style>
-  html, body { margin: 0; min-height: 100%; background: #111; color: #eee; }
-  body { font: 15px/1.7 system-ui, sans-serif; padding: 48px 16px; }
-  main { max-width: 640px; margin: 0 auto; }
-  h1 { font-size: 22px; margin: 0 0 8px; }
-  p { color: #bbb; margin: 0 0 24px; }
-  a.card {
-    display: block; padding: 16px 18px; margin-bottom: 12px;
-    border-radius: 10px; background: #1d1d1d; color: #fff; text-decoration: none;
-    border: 1px solid #2c2c2c;
+  /*
+    UI はすべて無彩色（r = g = b）。色は色立体からだけ出す。
+    色を見比べるときに、周りの色の影響を受けないようにするため。
+  */
+  :root {
+    --bg: #1c1c1c;
+    --surface: #262626;
+    --rule: #3a3a3a;
+    --text: #f0f0f0;
+    --text-sub: #a8a8a8;
+    --page-max: 1200px;
+    --gutter: 24px;
   }
-  a.card:hover { border-color: #555; }
-  a.card strong { display: block; font-size: 16px; }
-  a.card span { color: #aaa; font-size: 13px; }
-  p a { color: #8ab4ff; margin-left: 4px; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 16px/1.8 "BIZ UDPGothic", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--text); outline-offset: 3px; border-radius: 2px;
+  }
+
+  /* ---- 上部のサイト名 ---- */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    max-width: var(--page-max); margin: 0 auto; padding: 14px var(--gutter);
+    font-size: 14px;
+  }
+  .topbar .site { font-weight: 700; text-decoration: none; }
+  .topbar a:not(.site) { color: var(--text-sub); text-decoration: none; }
+  .topbar a:not(.site):hover { color: var(--text); }
+
+  /* ---- ヒーロー：左に文字、右に立ち上がる色立体 ---- */
+  .hero {
+    display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    align-items: center;
+    min-height: min(72vh, 660px);
+    padding-left: max(var(--gutter), calc((100vw - var(--page-max)) / 2 + var(--gutter)));
+  }
+  .hero-text { padding: 32px 24px 48px 0; }
+  .hero h1 {
+    margin: 0 0 24px;
+    font-size: clamp(34px, 4.4vw, 58px); line-height: 1.24; font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .hero-lead {
+    margin: 0; max-width: 26em; min-height: calc(1.95em * 4);
+    font-size: 17px; line-height: 1.95; color: #c8c8c8;
+    transition: opacity .15s;
+  }
+  .hero-lead.is-swapping { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-lead { transition: none; }
+  }
+
+  .hero-stage { position: relative; align-self: stretch; min-height: 440px; }
+  .hero-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage-caption {
+    position: absolute; left: 20px; bottom: 20px; right: 160px; margin: 0;
+    font-size: 14px; line-height: 1.6; color: var(--text-sub);
+  }
+  .replay {
+    position: absolute; right: 20px; bottom: 16px;
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 4px; cursor: pointer;
+    background: var(--surface); color: var(--text); border: 1px solid var(--rule);
+  }
+  .replay:hover { border-color: var(--text-sub); }
+
+  /* ---- ヘッダーすぐ下のページ一覧 ---- */
+  .pagebar { max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter); }
+  .pages {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 28px; border-bottom: 1px solid var(--rule);
+  }
+  .page {
+    display: block; padding: 12px 0 14px; border-top: 1px solid var(--rule);
+    font-size: 15px; font-weight: 700; line-height: 1.6; text-decoration: none;
+  }
+  .page:hover, .page:focus-visible { text-decoration: underline; text-underline-offset: 4px; }
+
+  footer {
+    max-width: var(--page-max); margin: 0 auto; padding: 24px var(--gutter) 48px;
+    font-size: 13px; color: var(--text-sub);
+  }
+  footer a { color: var(--text-sub); }
+
+  /* ---- 狭い画面：立体を上、文字を下に ---- */
+  @media (max-width: 1000px) {
+    .pages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 800px) {
+    .page { padding: 10px 0; }
+    .hero { grid-template-columns: 1fr; min-height: 0; padding-left: 0; }
+    .hero-stage { order: -1; height: 58vh; min-height: 320px; }
+    .hero-text { padding: 24px var(--gutter) 32px; }
+    .stage-caption { left: 16px; right: 140px; bottom: 14px; font-size: 13px; }
+    .replay { right: 16px; bottom: 10px; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>xy色度図を立体で見る</h1>
-  <p>xy色度図には明るさの軸がありません。明るさ（Y）を足すと、画面で出せる色の範囲は立体になります。ドラッグで回転、ホイールでズーム。<a href="about.html">説明を見る →</a></p>
-  <a class="card" href="color-solid.html">
-    <strong>色度図に明るさを足して見る</strong>
-    <span>画面で出せる色を5,832個の点にして、立体の中まで眺める</span>
-  </a>
-  <a class="card" href="color-solid-mesh.html">
-    <strong>色度図の立体を面で見る</strong>
-    <span>画面で出せる色の範囲（色域）の外側を、なめらかな面で正確に描く</span>
-  </a>
-  <a class="card" href="confusion-lines.html">
-    <strong>混同色線を立体で見る</strong>
-    <span>1型・2型・3型で見分けにくい色が、立体のどこに並ぶかを断面で確かめる</span>
-  </a>
-  <a class="card" href="hue-slices.html">
-    <strong>等色相面を立体で見る</strong>
-    <span>黄は明るく、青は暗いところで最も鮮やかになる。色相ごとの断面で比べる</span>
-  </a>
-</main>
+
+<div class="topbar">
+  <a class="site" href="index.html">xy色度図を立体で見る</a>
+  <a href="about.html">このサイトの見方</a>
+</div>
+
+<div class="pagebar">
+  <nav class="pages" aria-label="ページ一覧">
+    <a class="page" href="color-solid.html" data-lead="画面で出せる5,832色を、1色ずつ点にして xyY の空間に並べます。立体の外側だけでなく、中まで色が詰まっている様子が見えます。">色度図に明るさを足して見る</a>
+    <a class="page" href="color-solid-mesh.html" data-lead="画面で出せる色の範囲の外側を、なめらかな面で正確に描きます。xyY と CIELAB を切り替えると、同じ色の範囲が形を変える様子が分かります。">色度図の立体を面で見る</a>
+    <a class="page" href="confusion-lines.html" data-lead="混同色線は、立体の中では縦の面になります。1型・2型・3型の見え方と並べて、深緑と濃い灰色が見分けにくい理由を確かめられます。">混同色線を立体で見る</a>
+    <a class="page" href="hue-slices.html" data-lead="色相ごとに切った等色相面で、純色の明るさを比べます。黄は白に近い明るさで、青は暗いところで最も鮮やかになります。">等色相面を立体で見る</a>
+  </nav>
+</div>
+
+<header class="hero">
+  <div class="hero-text">
+    <h1>xy色度図に、<br />明るさの軸を1本。</h1>
+    <p class="hero-lead" id="heroLead">
+      テキストの xy色度図は、この立体を真上から見た図です。
+      縦に明るさ Y を足すと、混同色線は「面」に、純色の明るさの違いは「高さ」になって見えてきます。
+    </p>
+  </div>
+  <div class="hero-stage">
+    <canvas id="heroCanvas" role="img"
+      aria-label="真上から見た xy色度図が、明るさ Y の方向に立ち上がって色立体になるアニメーション"></canvas>
+    <p class="stage-caption" id="stageCaption" aria-live="polite"></p>
+    <button class="replay" id="replay" type="button">もう一度再生</button>
+  </div>
+</header>
+
+<footer>
+  <a href="https://github.com/junhongo-ccs/color">GitHub リポジトリ</a>
+</footer>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ============================================================
+// 1. 色変換（他のページと同じ式。sRGB(D65) → XYZ → xyY）
+// ============================================================
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+const M = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.0721750],
+  [0.0193339, 0.1191920, 0.9503041]
+];
+const toXYZ = ([r, g, b]) => M.map((row) => row[0] * r + row[1] * g + row[2] * b);
+function chromaticity([X, Y, Z]) {
+  const s = X + Y + Z;
+  return [X / s, Y / s];
+}
+const WHITE_XY = chromaticity(toXYZ([1, 1, 1]));
+
+// xyY → 表示座標。床（Y = 0）が y = 0 で、立体の高さは HEIGHT
+const HEIGHT = 6;
+const toLocal = (x, y, Y) => new THREE.Vector3((x - 0.33) * 8, Y * HEIGHT, -(y - 0.33) * 8);
+
+// ============================================================
+// 2. 色立体の外殻（RGB 立方体の6面を xyY へ写す。color-solid-mesh.html と同じ構成）
+// ============================================================
+function buildShell(S = 40) {
+  const positions = [], colors = [], indices = [];
+  let count = 0;
+  const push = (lin, chroma = lin) => {
+    const Y = toXYZ(lin)[1];
+    const [x, y] = chromaticity(toXYZ(chroma));
+    const p = toLocal(x, y, Y);
+    positions.push(p.x, p.y, p.z);
+    colors.push(lin[0], lin[1], lin[2]);
+    return count++;
+  };
+  const patch = (nu, nv, sample) => {
+    const base = count;
+    for (let j = 0; j <= nv; j++) {
+      for (let i = 0; i <= nu; i++) {
+        const { lin, chroma } = sample(i / nu, j / nv);
+        push(lin, chroma);
+      }
+    }
+    for (let j = 0; j < nv; j++) {
+      for (let i = 0; i < nu; i++) {
+        const a = base + j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+  };
+  const toLinear = (enc) => enc.map(srgbToLinear);
+  for (let k = 0; k < 3; k++) {
+    const [p, q] = [0, 1, 2].filter((c) => c !== k);
+    // 上側の面（チャンネル k = 1）
+    patch(S, S, (u, v) => {
+      const enc = [0, 0, 0];
+      enc[k] = 1; enc[p] = u; enc[q] = v;
+      return { lin: toLinear(enc) };
+    });
+    // 壁（チャンネル k = 0）を黒からの光線として張る
+    patch(2 * S, S, (t, s) => {
+      const enc = [0, 0, 0];
+      enc[p] = t < 0.5 ? 1 : 2 - 2 * t;
+      enc[q] = t < 0.5 ? 2 * t : 1;
+      const edge = toLinear(enc);
+      const sLin = srgbToLinear(s);
+      return { lin: edge.map((c) => c * sLin), chroma: edge };
+    });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  g.setIndex(indices);
+  return g;
+}
+
+// ============================================================
+// 3. シーン
+// ============================================================
+const canvas = document.getElementById("heroCanvas");
+const stage = canvas.parentElement;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+
+// 立ち上がる部分（色立体と無彩色軸）。scale.y を 0 → 1 にして「明るさの軸を足す」
+const solid = new THREE.Group();
+solid.add(new THREE.Mesh(
+  buildShell(),
+  new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })
+));
+solid.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([toLocal(...WHITE_XY, 0), toLocal(...WHITE_XY, 1.04)]),
+  new THREE.LineBasicMaterial({ color: 0xffffff })
+));
+scene.add(solid);
+
+// 床：テキストの xy色度図と同じ方眼（0.1 刻み）と x 軸・y 軸
+{
+  const grid = [], axes = [];
+  for (let v = 0; v <= 0.8001; v += 0.1) grid.push(toLocal(v, 0, 0), toLocal(v, 0.9, 0));
+  for (let v = 0; v <= 0.9001; v += 0.1) grid.push(toLocal(0, v, 0), toLocal(0.8, v, 0));
+  axes.push(toLocal(0, 0, 0), toLocal(0.85, 0, 0), toLocal(0, 0, 0), toLocal(0, 0.95, 0));
+  const floor = new THREE.Group();
+  floor.add(new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(grid),
+    new THREE.LineBasicMaterial({ color: 0x333333 })
+  ));
+  floor.add(new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(axes),
+    new THREE.LineBasicMaterial({ color: 0x8a8a8a })
+  ));
+  floor.position.y = -0.01; // 色度図の面とちらつかないよう、わずかに下げる
+  scene.add(floor);
+}
+
+// 軸の名前（x・y は床、Y は立ち上がる軸の先端）
+function makeLabel(text) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#d0d0d0";
+  ctx.font = "italic 88px Georgia, 'Times New Roman', serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sprite.scale.setScalar(0.55);
+  scene.add(sprite);
+  return sprite;
+}
+makeLabel("x").position.copy(toLocal(0.9, 0, 0));
+makeLabel("y").position.copy(toLocal(0, 1.0, 0));
+const labelY = makeLabel("Y");
+
+// ============================================================
+// 4. アニメーション：真上から見た色度図 → 明るさの軸が伸びて立体に
+// ============================================================
+const caption = document.getElementById("stageCaption");
+const CAPTIONS = {
+  flat: "真上から見ると、テキストでおなじみの xy色度図。",
+  rise: "そこに、明るさ Y の軸を足していくと……",
+  done: "画面で出せる色の範囲が、立体になりました。"
+};
+const HOLD = 1100, RISE = 2800;                 // ミリ秒
+const PHI_TOP = 0.0008, PHI_END = 1.08;          // 真上 → 斜め上から
+const THETA_END = -0.55;                         // 立ち上がりながら少し回り込む
+const TARGET = new THREE.Vector3(0.3, 0, -0.2);  // 色度図の三角形のあたり
+const RADIUS = 4.6;                              // 平面の方眼と立体の両方を包む球の半径
+
+const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let start = 0;
+let finished = false;
+let controls = null;
+
+function fitDistance() {
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.min(1, camera.aspect);
+  return (RADIUS / Math.sin(Math.atan(tanHalf))) * 1.02;
+}
+
+// 進み具合 k（0〜1）に合わせて、立体の高さとカメラの位置を決める
+function pose(k) {
+  const s = Math.max(0.004, k); // 高さ 0 だと面が重なってちらつくので、わずかに残す
+  solid.scale.y = s;
+  labelY.position.copy(toLocal(...WHITE_XY, 1.04 * s)).add(new THREE.Vector3(0, 0.35, 0));
+  labelY.material.opacity = Math.min(1, k * 3);
+
+  const phi = PHI_TOP + (PHI_END - PHI_TOP) * k;
+  const theta = THETA_END * k;
+  const target = TARGET.clone().setY((HEIGHT / 2) * s);
+  const d = fitDistance();
+  camera.position.set(
+    target.x + d * Math.sin(phi) * Math.sin(theta),
+    target.y + d * Math.cos(phi),
+    target.z + d * Math.sin(phi) * Math.cos(theta)
+  );
+  camera.lookAt(target);
+  return target;
+}
+
+function play() {
+  finished = false;
+  if (controls) controls.enabled = false;
+  start = performance.now();
+  caption.textContent = CAPTIONS.flat;
+}
+
+function finish() {
+  finished = true;
+  const target = pose(1);
+  caption.textContent = CAPTIONS.done;
+  // マウスなどで細かく操作できる環境だけ、ドラッグで回せるようにする
+  // （タッチ端末ではページのスクロールを妨げないよう、回転操作は付けない）
+  if (window.matchMedia("(pointer: fine)").matches) {
+    if (!controls) {
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableZoom = false;
+      controls.enablePan = false;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+    }
+    controls.target.copy(target);
+    controls.enabled = true;
+    controls.update();
+  }
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  if (finished) finish();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+document.getElementById("replay").addEventListener("click", () => {
+  if (reduceMotion) return;
+  play();
+});
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  if (!finished) {
+    const t = now - start;
+    if (t < HOLD) {
+      pose(0);
+    } else if (t < HOLD + RISE) {
+      if (caption.textContent !== CAPTIONS.rise) caption.textContent = CAPTIONS.rise;
+      pose(ease((t - HOLD) / RISE));
+    } else {
+      finish();
+    }
+  } else if (controls) {
+    controls.update();
+  }
+  renderer.render(scene, camera);
+}
+
+// 動きを減らす設定のときは、立ち上がった状態から始める
+if (reduceMotion) {
+  document.getElementById("replay").hidden = true;
+  finish();
+} else {
+  play();
+}
+requestAnimationFrame(animate);
+
+// ============================================================
+// 5. ページ一覧にマウスを乗せると、ヒーローの本文がそのページの紹介に変わる
+// ============================================================
+const lead = document.getElementById("heroLead");
+// HTML の改行で文の間に空白が入らないよう、元の本文の改行を詰めておく
+const defaultLead = lead.textContent.trim().replace(/\s*\n\s*/g, "");
+lead.textContent = defaultLead;
+let swapTimer = 0;
+
+function showLead(text) {
+  if (lead.textContent === text) return;
+  clearTimeout(swapTimer);
+  lead.classList.add("is-swapping");
+  swapTimer = setTimeout(() => {
+    lead.textContent = text;
+    lead.classList.remove("is-swapping");
+  }, reduceMotion ? 0 : 150);
+}
+
+for (const page of document.querySelectorAll(".page[data-lead]")) {
+  page.addEventListener("pointerenter", () => showLead(page.dataset.lead));
+  page.addEventListener("focus", () => showLead(page.dataset.lead));
+  page.addEventListener("pointerleave", () => showLead(defaultLead));
+  page.addEventListener("blur", () => showLead(defaultLead));
+}
+</script>
+
 </body>
 </html>

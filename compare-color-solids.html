@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Color Solid Comparison</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+  canvas { display: block; touch-action: none; }
+  .label {
+    position: fixed; z-index: 20; top: 12px;
+    color: #fff; font: 600 13px system-ui, sans-serif;
+    background: rgba(0,0,0,.6); padding: 6px 10px; border-radius: 8px;
+    pointer-events: none;
+  }
+  #leftLabel { left: 12px; }
+  /* 横長：左右に分割 */
+  body.row #rightLabel { left: calc(50% + 12px); }
+  /* 縦長：上下に分割 */
+  body.column #rightLabel { left: 12px; top: calc(50% + 12px); }
+  #divider { position: fixed; z-index: 15; background: #333; pointer-events: none; }
+  body.row #divider { left: 50%; top: 0; width: 1px; height: 100%; }
+  body.column #divider { top: 50%; left: 0; height: 1px; width: 100%; }
+  #ui {
+    position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 20; color: #fff; font: 13px system-ui, sans-serif;
+    background: rgba(0,0,0,.65); padding: 8px 12px; border-radius: 8px;
+    display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center;
+    justify-content: center; max-width: calc(100% - 32px); box-sizing: border-box;
+  }
+  button, select {
+    font: inherit; padding: 4px 10px;
+    border: 0; border-radius: 6px; cursor: pointer;
+  }
+  #axisLabel { color: #bbb; width: 100%; text-align: center; }
+</style>
+</head>
+<body class="row">
+
+<div id="leftLabel" class="label">外殻メッシュ（立方体の6面を写像）</div>
+<div id="rightLabel" class="label">Marching Cubes</div>
+<div id="divider"></div>
+
+<div id="ui">
+  <button id="toggleSpace">表示: xyY</button>
+  <label>MC解像度
+    <select id="resolution">
+      <option value="24">24</option>
+      <option value="32">32</option>
+      <option value="48">48</option>
+      <option value="64" selected>64</option>
+      <option value="80">80</option>
+    </select>
+  </label>
+  <button id="toggleShade">陰影: ON</button>
+  <button id="toggleWire">ワイヤーフレーム: OFF</button>
+  <button id="toggleRotate">自動回転: ON</button>
+  <span id="axisLabel"></span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { MarchingCubes } from "three/addons/objects/MarchingCubes.js";
+
+// ============================================================
+// 1. 共通：色変換と表示座標
+// ============================================================
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+// sRGB(D65) -> CIE XYZ とその逆
+const M = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.0721750],
+  [0.0193339, 0.1191920, 0.9503041]
+];
+const M_INV = [
+  [ 3.2404542, -1.5371385, -0.4985314],
+  [-0.9692660,  1.8760108,  0.0415560],
+  [ 0.0556434, -0.2040259,  1.0572252]
+];
+
+function linearToXYZ([r, g, b]) {
+  return M.map((row) => row[0] * r + row[1] * g + row[2] * b);
+}
+function xyzToLinear([X, Y, Z]) {
+  return M_INV.map((row) => row[0] * X + row[1] * Y + row[2] * Z);
+}
+
+// D65 白色点
+const WHITE_XYZ = [0.95047, 1.0, 1.08883];
+
+const DELTA = 6 / 29;
+function labF(t) {
+  return t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29;
+}
+function labFInv(t) {
+  return t > DELTA ? t * t * t : 3 * DELTA * DELTA * (t - 4 / 29);
+}
+
+// 明るさ（Y / L*）は -1.5〜4.5、色度 y と b* は -Z 方向（他のページと同じ割り当て）
+const SPACES = {
+  xyY: {
+    axes: "横: 色度 x ／ 縦: 輝度 Y ／ 奥行: 色度 y",
+    // XYZ（と色度を決めるXYZ）→ 表示座標
+    toScene([X, Y, Z], [cX, cY, cZ]) {
+      const sum = cX + cY + cZ;
+      return [(cX / sum - 0.33) * 8, Y * 6 - 1.5, -(cY / sum - 0.33) * 8];
+    },
+    // 表示座標 → XYZ（定義できない場所は null）
+    toXYZ(wx, wy, wz) {
+      const x = wx / 8 + 0.33;
+      const y = -wz / 8 + 0.33;
+      const Y = (wy + 1.5) / 6;
+      if (y < 1e-4) return null;
+      return [(x * Y) / y, Y, ((1 - x - y) * Y) / y];
+    }
+  },
+  CIELAB: {
+    axes: "横: a*（緑→赤） ／ 縦: L* ／ 奥行: b*（青→黄）",
+    toScene([X, Y, Z]) {
+      const fx = labF(X / WHITE_XYZ[0]);
+      const fy = labF(Y / WHITE_XYZ[1]);
+      const fz = labF(Z / WHITE_XYZ[2]);
+      const L = 116 * fy - 16;
+      return [500 * (fx - fy) * 0.025, (L / 100) * 6 - 1.5, -200 * (fy - fz) * 0.025];
+    },
+    toXYZ(wx, wy, wz) {
+      const L = ((wy + 1.5) / 6) * 100;
+      const a = wx / 0.025;
+      const b = -wz / 0.025;
+      const fy = (L + 16) / 116;
+      return [
+        WHITE_XYZ[0] * labFInv(fy + a / 500),
+        WHITE_XYZ[1] * labFInv(fy),
+        WHITE_XYZ[2] * labFInv(fy - b / 200)
+      ];
+    }
+  }
+};
+const SPACE_NAMES = Object.keys(SPACES);
+
+// ============================================================
+// 2. 左：sRGB立方体の6面を写像した外殻メッシュ
+//    （color-solid-mesh.html と同じ構成）
+// ============================================================
+const S = 48; // 1面あたりの分割数
+
+const shellPositions = { xyY: [], CIELAB: [] };
+const shellColors = [];
+const shellIndices = [];
+let shellVertexCount = 0;
+
+// lin: この頂点の線形RGB
+// chromaLin: xyY の色度を求めるための線形RGB（黒に近い壁で色度を保つため）
+function pushVertex(lin, chromaLin = lin) {
+  const xyz = linearToXYZ(lin);
+  const chromaXYZ = linearToXYZ(chromaLin);
+  for (const name of SPACE_NAMES) {
+    shellPositions[name].push(...SPACES[name].toScene(xyz, chromaXYZ));
+  }
+  // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する
+  shellColors.push(lin[0], lin[1], lin[2]);
+  return shellVertexCount++;
+}
+
+function addPatch(nu, nv, sample) {
+  const base = shellVertexCount;
+  for (let j = 0; j <= nv; j++) {
+    for (let i = 0; i <= nu; i++) {
+      const { lin, chroma } = sample(i / nu, j / nv);
+      pushVertex(lin, chroma);
+    }
+  }
+  const row = nu + 1;
+  for (let j = 0; j < nv; j++) {
+    for (let i = 0; i < nu; i++) {
+      const a = base + j * row + i;
+      const b = a + 1;
+      const c = a + row;
+      const d = c + 1;
+      shellIndices.push(a, c, b, b, c, d);
+    }
+  }
+}
+
+const toLinear = (enc) => enc.map(srgbToLinear);
+
+// 上側の3面（R=1, G=1, B=1）
+for (let k = 0; k < 3; k++) {
+  const [p, q] = [0, 1, 2].filter((c) => c !== k);
+  addPatch(S, S, (u, v) => {
+    const enc = [0, 0, 0];
+    enc[k] = 1;
+    enc[p] = u;
+    enc[q] = v;
+    return { lin: toLinear(enc) };
+  });
+}
+
+// 壁の3面（R=0, G=0, B=0）を黒からの光線として張る
+for (let k = 0; k < 3; k++) {
+  const [p, q] = [0, 1, 2].filter((c) => c !== k);
+  addPatch(2 * S, S, (t, s) => {
+    const enc = [0, 0, 0];
+    enc[p] = t < 0.5 ? 1 : 2 - 2 * t;
+    enc[q] = t < 0.5 ? 2 * t : 1;
+    const edge = toLinear(enc);
+    const sLin = srgbToLinear(s);
+    return { lin: edge.map((c) => c * sLin), chroma: edge };
+  });
+}
+
+// 底面：xyY では Y=0 の色度三角形、CIELAB では黒の1点に縮退する
+{
+  const r = pushVertex([0, 0, 0], [1, 0, 0]);
+  const g = pushVertex([0, 0, 0], [0, 1, 0]);
+  const b = pushVertex([0, 0, 0], [0, 0, 1]);
+  shellIndices.push(r, g, b);
+}
+
+const SHELL_TARGETS = {
+  xyY: new Float32Array(shellPositions.xyY),
+  CIELAB: new Float32Array(shellPositions.CIELAB)
+};
+
+const shellGeometry = new THREE.BufferGeometry();
+const shellPositionAttr = new THREE.BufferAttribute(SHELL_TARGETS.xyY.slice(), 3);
+shellPositionAttr.setUsage(THREE.DynamicDrawUsage);
+shellGeometry.setAttribute("position", shellPositionAttr);
+shellGeometry.setAttribute("color", new THREE.Float32BufferAttribute(shellColors, 3));
+shellGeometry.setIndex(shellIndices);
+shellGeometry.computeVertexNormals();
+
+// ============================================================
+// 3. 右：Marching Cubes
+//    各ボクセルを線形RGBに戻し、f = min(r, g, b, 1-r, 1-g, 1-b) を場にする。
+//    f = 0 の等値面が色域の境界（color-solid-marching-cubes.html と同じ構成）
+// ============================================================
+const MC_CENTER = [0, 1.5, 0]; // 表示空間でのボリュームの中心
+const MC_HALF = 3.4;           // ボリュームの半径（-1〜1 → ±MC_HALF）
+
+function buildField(size, toXYZ) {
+  const size3 = size * size * size;
+  const field = new Float32Array(size3);
+  const palette = new Float32Array(size3 * 3);
+
+  for (let z = 0; z < size; z++) {
+    const wz = MC_CENTER[2] + MC_HALF * ((z - size / 2) / (size / 2));
+    for (let y = 0; y < size; y++) {
+      const wy = MC_CENTER[1] + MC_HALF * ((y - size / 2) / (size / 2));
+      for (let x = 0; x < size; x++) {
+        const wx = MC_CENTER[0] + MC_HALF * ((x - size / 2) / (size / 2));
+        const i = size * size * z + size * y + x;
+
+        const xyz = toXYZ(wx, wy, wz);
+        if (!xyz) {
+          field[i] = -1;
+          continue;
+        }
+        const [r, g, b] = xyzToLinear(xyz);
+        // 色域から遠い場所は値が極端になるので -1 で頭打ちにする
+        field[i] = Math.max(-1, Math.min(r, g, b, 1 - r, 1 - g, 1 - b));
+        palette[i * 3 + 0] = Math.min(1, Math.max(0, r));
+        palette[i * 3 + 1] = Math.min(1, Math.max(0, g));
+        palette[i * 3 + 2] = Math.min(1, Math.max(0, b));
+      }
+    }
+  }
+  return { field, palette };
+}
+
+// 解像度ごとに場を作ってキャッシュする
+const fieldCache = new Map();
+function getFields(size) {
+  if (!fieldCache.has(size)) {
+    fieldCache.set(size, {
+      xyY: buildField(size, SPACES.xyY.toXYZ),
+      CIELAB: buildField(size, SPACES.CIELAB.toXYZ)
+    });
+  }
+  return fieldCache.get(size);
+}
+
+// ============================================================
+// 4. マテリアル（左右で同じ設定を使い、条件を揃える）
+// ============================================================
+const shadedMaterial = new THREE.MeshLambertMaterial({
+  vertexColors: true,
+  side: THREE.DoubleSide
+});
+// 光源の影響を受けず、色そのものを正確に見せる
+const flatMaterial = new THREE.MeshBasicMaterial({
+  vertexColors: true,
+  side: THREE.DoubleSide
+});
+let shaded = true;
+const currentMaterial = () => (shaded ? shadedMaterial : flatMaterial);
+
+const shellMesh = new THREE.Mesh(shellGeometry, shadedMaterial);
+shellMesh.frustumCulled = false;
+
+// ============================================================
+// 5. 2つのシーン（同じカメラで描く）
+// ============================================================
+function createScene() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111111);
+  scene.add(new THREE.AxesHelper(2.5));
+  // 正面の明るさが元の色とほぼ同じになる強さ（r155以降は π で等倍）
+  scene.add(new THREE.AmbientLight(0xffffff, Math.PI * 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, Math.PI * 0.55);
+  scene.add(key, key.target);
+  return { scene, key };
+}
+
+const left = createScene();
+const right = createScene();
+left.scene.add(shellMesh);
+
+let mcResolution = 64;
+let marching = null;
+
+function createMarching(size) {
+  const mc = new MarchingCubes(size, currentMaterial(), false, true, 120000);
+  mc.isolation = 0;
+  mc.position.set(...MC_CENTER);
+  mc.scale.setScalar(MC_HALF);
+  mc.frustumCulled = false;
+  return mc;
+}
+
+// 2つの場を k で混ぜて等値面を作り直す（k=0: from, k=1: to）
+function applyField(from, to, k) {
+  marching.reset(); // 法線キャッシュのクリアも兼ねる
+  const f = marching.field;
+  const p = marching.palette;
+  for (let i = 0; i < f.length; i++) {
+    f[i] = from.field[i] + (to.field[i] - from.field[i]) * k;
+  }
+  for (let i = 0; i < p.length; i++) {
+    p[i] = from.palette[i] + (to.palette[i] - from.palette[i]) * k;
+  }
+  marching.update();
+}
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+camera.position.set(5.2, 4.7, 6.6);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setScissorTest(true);
+document.body.appendChild(renderer.domElement);
+
+// ============================================================
+// 6. 操作：1つの OrbitControls で左右を同じ視点に保つ
+// ============================================================
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.minDistance = 2;
+controls.maxDistance = 20;
+
+// ============================================================
+// 7. 色空間の切替（左は頂点、右はスカラー場を同じタイミングで補間）
+// ============================================================
+const MORPH_SECONDS = 0.9;
+let currentSpace = "xyY";
+let morphT = 1;
+let shellFrom = null;
+let fieldFrom = null;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function setShellBlend(from, to, k) {
+  const arr = shellPositionAttr.array;
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = from[i] + (to[i] - from[i]) * k;
+  }
+  shellPositionAttr.needsUpdate = true;
+  if (shaded) shellGeometry.computeVertexNormals();
+}
+
+function updateMorph(dt) {
+  if (morphT >= 1) return;
+  morphT = Math.min(1, morphT + dt / MORPH_SECONDS);
+  const k = easeInOutCubic(morphT);
+  setShellBlend(shellFrom, SHELL_TARGETS[currentSpace], k);
+  applyField(fieldFrom, getFields(mcResolution)[currentSpace], k);
+}
+
+const spaceButton = document.getElementById("toggleSpace");
+const axisLabel = document.getElementById("axisLabel");
+const rightLabel = document.getElementById("rightLabel");
+
+function updateLabels() {
+  spaceButton.textContent = `表示: ${currentSpace}`;
+  axisLabel.textContent = SPACES[currentSpace].axes;
+  rightLabel.textContent = `Marching Cubes（解像度 ${mcResolution}）`;
+}
+
+spaceButton.addEventListener("click", () => {
+  currentSpace = currentSpace === "xyY" ? "CIELAB" : "xyY";
+  // 切替途中で押された場合も、今の形から滑らかに向かう
+  shellFrom = shellPositionAttr.array.slice();
+  fieldFrom = { field: marching.field.slice(), palette: marching.palette.slice() };
+  morphT = 0;
+  updateLabels();
+});
+
+// 解像度の変更：新しい MarchingCubes を作り、現在の色空間の形で表示する
+const resolutionSelect = document.getElementById("resolution");
+
+function setResolution(size) {
+  mcResolution = size;
+  if (marching) {
+    right.scene.remove(marching);
+    marching.geometry.dispose();
+  }
+  marching = createMarching(size);
+  right.scene.add(marching);
+
+  // 切替アニメーション中なら、左も含めて目標の形へ確定させる
+  if (morphT < 1) {
+    morphT = 1;
+    setShellBlend(SHELL_TARGETS[currentSpace], SHELL_TARGETS[currentSpace], 1);
+  }
+  const target = getFields(size)[currentSpace];
+  applyField(target, target, 1);
+  updateLabels();
+}
+
+resolutionSelect.addEventListener("change", () => {
+  const size = Number(resolutionSelect.value);
+  rightLabel.textContent = "Marching Cubes（計算中…）";
+  // ラベルを描画させてから重い計算に入る
+  setTimeout(() => setResolution(size), 30);
+});
+
+setResolution(mcResolution);
+
+// ============================================================
+// 8. 描画：画面を2分割（横長は左右、縦長は上下）
+// ============================================================
+const lightOffset = new THREE.Vector3();
+
+function placeKeyLight(key) {
+  // カメラから見て左上から光が当たるようにする
+  lightOffset.set(-2, 3, 4).applyQuaternion(camera.quaternion);
+  key.position.copy(controls.target).add(lightOffset);
+  key.target.position.copy(controls.target);
+}
+
+function render() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const isRow = w >= h;
+  document.body.className = isRow ? "row" : "column";
+
+  // setViewport / setScissor は左下原点
+  const views = isRow
+    ? [
+        { s: left, x: 0, y: 0, w: Math.floor(w / 2), h },
+        { s: right, x: Math.floor(w / 2), y: 0, w: w - Math.floor(w / 2), h }
+      ]
+    : [
+        { s: left, x: 0, y: h - Math.floor(h / 2), w, h: Math.floor(h / 2) },
+        { s: right, x: 0, y: 0, w, h: h - Math.floor(h / 2) }
+      ];
+
+  camera.aspect = views[0].w / views[0].h;
+  camera.updateProjectionMatrix();
+
+  for (const v of views) {
+    placeKeyLight(v.s.key);
+    renderer.setViewport(v.x, v.y, v.w, v.h);
+    renderer.setScissor(v.x, v.y, v.w, v.h);
+    renderer.render(v.s.scene, camera);
+  }
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  updateMorph(clock.getDelta());
+  controls.update();
+  render();
+}
+animate();
+
+// ============================================================
+// 9. ボタン
+// ============================================================
+const shadeButton = document.getElementById("toggleShade");
+shadeButton.addEventListener("click", () => {
+  shaded = !shaded;
+  shellMesh.material = currentMaterial();
+  marching.material = currentMaterial();
+  if (shaded) shellGeometry.computeVertexNormals();
+  shadeButton.textContent = `陰影: ${shaded ? "ON" : "OFF"}`;
+});
+
+const wireButton = document.getElementById("toggleWire");
+wireButton.addEventListener("click", () => {
+  const on = !shadedMaterial.wireframe;
+  shadedMaterial.wireframe = on;
+  flatMaterial.wireframe = on;
+  wireButton.textContent = `ワイヤーフレーム: ${on ? "ON" : "OFF"}`;
+});
+
+const rotateButton = document.getElementById("toggleRotate");
+rotateButton.addEventListener("click", () => {
+  controls.autoRotate = !controls.autoRotate;
+  rotateButton.textContent = `自動回転: ${controls.autoRotate ? "ON" : "OFF"}`;
+});
+
+window.addEventListener("resize", () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>

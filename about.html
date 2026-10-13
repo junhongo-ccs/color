@@ -24,6 +24,12 @@
   }
   .lead { color: #bbb; font-size: 16px; }
   .note { color: #aaa; font-size: 14px; }
+  .aside {
+    margin: 20px 0; padding: 14px 16px 2px;
+    background: #1a1a1a; border: 1px solid #2c2c2c; border-left: 3px solid #8ab4ff;
+    border-radius: 8px;
+  }
+  .aside-title { color: #fff; font-weight: 600; margin-bottom: 8px; }
   .table-wrap { overflow-x: auto; margin: 0 0 14px; }
   table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
   th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid #2c2c2c; }
@@ -54,8 +60,8 @@
   <nav>
     <a href="color-solid.html">点群</a>
     <a href="color-solid-mesh.html">外殻メッシュ</a>
-    <a href="color-solid-marching-cubes.html">Marching Cubes</a>
-    <a href="compare-color-solids.html">比較</a>
+    <a href="confusion-lines.html">混同色線</a>
+    <a href="hue-slices.html">色相断面</a>
   </nav>
   <a class="about" href="about.html" aria-current="page">説明を見る</a>
 </header>
@@ -64,7 +70,8 @@
   <h1>sRGB 色立体ビューアについて</h1>
   <p class="lead">
     パソコンやスマホの画面で表示できる色の範囲を、3次元の立体として回して眺めるためのビューアです。
-    同じ色の範囲を2つの色空間（xyY と CIELAB）で表示し、4通りの方法で描いています。
+    同じ色の範囲を2つの色空間（xyY と CIELAB）で表示し、点群と外殻メッシュの2通りの方法で描いています。
+    また、色彩検定 UC級で学ぶ混同色線や、色相ごとの明度の違いを、立体の上で確かめるページもあります。
   </p>
 
   <h2>色立体とは</h2>
@@ -89,6 +96,29 @@
     <li>空間上の距離は見た目の色の差と一致しません。たとえば緑のあたりは実際の見え方の違い以上に広がって見えます。</li>
   </ul>
 
+  <div class="aside">
+    <p class="aside-title">色彩検定 UC級の視点から：混同色線と明るさ</p>
+    <p>
+      UC級で学ぶ<strong>混同色線</strong>は、xy 色度図、つまりこの立体を真上から見た図の上に引かれる直線です。
+      同じ混同色線の上にある色どうしは、P型・D型などの色覚では色みの違いとしてはほとんど区別できません。
+    </p>
+    <p>
+      ただし、色度図には立体の縦軸である明るさ（Y）が表れていません。
+      同じ混同色線上の色でも明るさに差があれば、それを手がかりに区別できることがあります。
+      逆に、混同色線上にあって明るさも近い組み合わせ（たとえば深緑と濃い灰色）は、特に見分けにくくなります。
+    </p>
+    <p class="note">
+      ここでの Y は一般的な色覚を基準にした明るさです。P型の色覚では赤い光が暗く感じられるため、
+      赤みの強い色は Y の値よりも暗く見えます（赤と黒が見分けにくいのはこのためです）。
+      Y の差だけで見分けやすさを判断できるわけではない点に注意してください。
+    </p>
+    <p>
+      <a href="confusion-lines.html">混同色線のページ</a>では、混同色線を xyY 立体の縦の断面として表示し、
+      その面に乗る色の一般的な見え方と、各タイプの見え方のシミュレーションを並べて比べられます。
+      初期表示の「D型・白色点を通る線」では、深い緑と灰色が同じ面に乗っていることを確かめられます。
+    </p>
+  </div>
+
   <h3>CIELAB（L*a*b*）</h3>
   <ul>
     <li><code>L*</code> は明るさ（明度）、<code>a*</code> は緑↔赤、<code>b*</code> は青↔黄を表します。縦軸が <code>L*</code> です。</li>
@@ -96,14 +126,15 @@
     <li>黒と白は中心の縦軸の下端と上端の1点になり、原色は外側に張り出した角になります。</li>
     <li>
       黄色は明るい位置で、青は暗い位置で大きく外へ張り出します。
-      色みによって、最も鮮やかになる明るさが違うことが形から分かります。
+      色みによって、最も鮮やかになる明るさが違うことが形から分かります
+      （<a href="hue-slices.html">色相断面のページ</a>で、色相ごとに確かめられます）。
     </li>
   </ul>
   <p class="note">
-    各ページの「表示」ボタンで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
+    点群と外殻メッシュのページの「xyY ／ CIELAB」の切り替えで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
   </p>
 
-  <h2>4つの表示</h2>
+  <h2>各ページの内容</h2>
   <div class="table-wrap">
     <table>
       <thead>
@@ -121,14 +152,14 @@
           <td>色域の境界を正確に表します。各面の色は、その位置で表せる最も外側の色です。</td>
         </tr>
         <tr>
-          <td><a href="color-solid-marching-cubes.html">Marching Cubes</a></td>
-          <td>空間を細かい立方体（ボクセル）に区切り、色域の内と外の境目を面として取り出します。</td>
-          <td>陰影付きで形の凹凸が分かりやすくなります。</td>
+          <td><a href="confusion-lines.html">混同色線</a></td>
+          <td>xyY 立体に、P型・D型・T型の混同色線を含む縦の面を重ねます。</td>
+          <td>同じ面に乗る色が、そのタイプの色覚では明るさの違いでしか区別しにくいことを、断面の色とシミュレーションで確かめられます。</td>
         </tr>
         <tr>
-          <td><a href="compare-color-solids.html">比較</a></td>
-          <td>外殻メッシュと Marching Cubes を同じ視点で並べます。</td>
-          <td>Marching Cubes の解像度を変えると、角の削れ方や面の粗さが変わる様子を比べられます。</td>
+          <td><a href="hue-slices.html">色相断面</a></td>
+          <td>CIELAB の立体を、色相 h とその反対側 h+180° を含む縦の面で切ります。</td>
+          <td>断面の頂点（その色相で最も鮮やかな色）の高さが色相ごとに違い、黄は明るく青は暗いところで最も鮮やかになることが分かります。</td>
         </tr>
       </tbody>
     </table>
@@ -147,33 +178,20 @@
     <li>黒の1点は、xyY では明るさ0の底面（三角形）全体に広がり、CIELAB では1点のままです。</li>
   </ul>
 
-  <h3>Marching Cubes：内側かどうかを測って面を取り出す</h3>
-  <p>
-    空間内の各点を RGB に逆変換し、「RGB 立方体の内側にどれだけ入り込んでいるか」を
-    <code>min(r, g, b, 1−r, 1−g, 1−b)</code> で計算します。
-    この値は色域の内側で正、外側で負になり、ちょうど0になる場所が色域の境界です。
-    Marching Cubes 法は、この値が0になる面を三角形の集まりとして取り出します。
-  </p>
-  <p>
-    逆変換さえできれば、どんな色空間でも同じ手順で形を作れるのが利点です。
-    一方で、ボクセルより細かい形は表せないため、白や原色の鋭い角が少し削れます。
-  </p>
-
   <h2>操作方法</h2>
   <ul>
     <li><strong>ドラッグ</strong>：回転</li>
     <li><strong>ホイール／ピンチ</strong>：ズーム</li>
     <li><strong>右ドラッグ／2本指ドラッグ</strong>：平行移動</li>
-    <li><strong>表示</strong>：xyY と CIELAB を切り替え</li>
-    <li><strong>陰影</strong>：光を当てて形を見やすくする表示と、色そのものを見る表示を切り替え</li>
-    <li><strong>ワイヤーフレーム</strong>：面を作っている三角形の網目を表示</li>
-    <li><strong>MC解像度</strong>（比較ページ）：Marching Cubes のボクセルの細かさ</li>
+    <li><strong>xyY ／ CIELAB</strong>（点群・外殻メッシュ）：色空間を切り替え。選ばれている方が白く表示されます</li>
+    <li><strong>ワイヤーフレーム</strong>（外殻メッシュ）：面を作っている三角形の網目を表示</li>
     <li><strong>自動回転</strong>：ゆっくり回し続けるかどうか</li>
+    <li>ON/OFF の項目はスイッチで表しています。つまみが右で青いときが ON です</li>
   </ul>
 
   <h2>表示についての注意</h2>
   <ul>
-    <li>点や面の色は、その位置が表す sRGB の色そのものです。ただし陰影を ON にすると、形を見やすくするため明るさが変わります。</li>
+    <li>点や面の色は、その位置が表す sRGB の色そのものです（光による陰影はつけていません）。</li>
     <li>見やすさのため軸ごとに拡大率を調整しているので、xyY と CIELAB の立体の大きさをそのまま比べることはできません。</li>
     <li>白色点は D65、sRGB の変換式は IEC 61966-2-1 に従っています。</li>
     <li>表示されるのはお使いの画面で再現できる色です。広い色域のモニターで見ても、ここで描いているのは sRGB の範囲です。</li>

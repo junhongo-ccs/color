@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CIELAB Hue Slices</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+  canvas#view { display: block; touch-action: none; }
+
+  /* 右側（狭い画面では下側）の操作パネル */
+  #panel {
+    position: fixed; z-index: 20; top: 56px; right: 12px; width: 360px;
+    max-height: calc(100% - 68px); overflow-y: auto; box-sizing: border-box;
+    color: #e6e6e6; font: 14px/1.65 system-ui, sans-serif;
+    background: rgba(20,20,20,.92); border: 1px solid #2c2c2c; border-radius: 10px;
+    padding: 12px 14px;
+  }
+  @media (max-width: 760px) {
+    #panel {
+      top: auto; bottom: 8px; left: 8px; right: 8px; width: auto;
+      max-height: 46vh;
+    }
+  }
+  #panel h2 { font-size: 14px; margin: 14px 0 6px; color: #fff; }
+  #panel h2:first-child { margin-top: 0; }
+  button {
+    font: inherit; padding: 4px 10px; border: 0; border-radius: 6px; cursor: pointer;
+    background: #2a2a2a; color: #ddd;
+  }
+  button:hover { background: #363636; }
+  /* 操作部品：ON/OFF はスイッチ、択一はセグメントボタン（状態と操作を取り違えないように） */
+  .switch {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 6px; background: none; color: #ddd;
+  }
+  .switch:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .switch .track {
+    position: relative; flex: none; width: 34px; height: 20px; border-radius: 10px;
+    background: #4a4a4a; transition: background .15s;
+  }
+  .switch .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px;
+    border-radius: 50%; background: #bbb; transition: transform .15s, background .15s;
+  }
+  .switch[aria-checked="true"] .track { background: #4c86e8; }
+  .switch[aria-checked="true"] .track::after { transform: translateX(14px); background: #fff; }
+  .seg {
+    display: inline-flex; gap: 2px; padding: 2px;
+    background: #1c1c1c; border: 1px solid #333; border-radius: 8px;
+  }
+  .seg button { padding: 4px 12px; border-radius: 6px; background: none; color: #bbb; }
+  .seg button:hover { background: #2a2a2a; color: #fff; }
+  .seg button[aria-pressed="true"] { background: #e6e6e6; color: #111; font-weight: 600; }
+  button:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
+  input[type="range"] { width: 100%; margin: 4px 0 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .presets button { padding: 3px 8px; }
+  .dot {
+    display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+    vertical-align: -1px; margin-right: 4px;
+  }
+  #hueValue { color: #fff; font-weight: 600; }
+  figure { margin: 10px 0 0; }
+  figcaption { color: #bbb; font-size: 13px; margin-bottom: 4px; }
+  .chart {
+    display: block; width: 100%; border-radius: 4px; cursor: crosshair;
+    /* 色域の外を市松模様にして、透明部分を分かりやすくする */
+    background: repeating-conic-gradient(#1b1b1b 0% 25%, #232323 0% 50%) 0 0 / 12px 12px;
+  }
+  #slice { aspect-ratio: 560 / 200; }
+  #cuspChart { aspect-ratio: 600 / 220; background: #1a1a1a; }
+  .axis { display: flex; justify-content: space-between; color: #999; font-size: 12px; }
+  #cusps, #readout {
+    margin-top: 8px; padding: 8px; background: #1a1a1a; border-radius: 6px;
+    font-size: 13px; color: #bbb;
+  }
+  #readout { min-height: 40px; }
+  .sw {
+    display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    vertical-align: -2px; margin: 0 4px; border: 1px solid #555;
+  }
+  .note { color: #d0d0d0; font-size: 14.5px; line-height: 1.9; margin: 0 0 14px; }
+  .note a { color: #8ab4ff; }
+
+  /* パネル内のタブ（操作 / 解説） */
+  .tabs { display: flex; gap: 2px; margin: -4px 0 12px; border-bottom: 1px solid #2c2c2c; }
+  .tabs button {
+    background: none; color: #aaa; padding: 6px 14px; border-radius: 6px 6px 0 0;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tabs button:hover { background: #222; color: #fff; }
+  .tabs button[aria-selected="true"] { color: #fff; font-weight: 600; border-bottom-color: #8ab4ff; }
+  [role="tabpanel"][hidden] { display: none; }
+
+  /* 共通ヘッダー：一覧へ戻るリンクとページ切替 */
+  #siteHeader {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    height: 44px; box-sizing: border-box; padding: 0 12px;
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(17,17,17,.85); border-bottom: 1px solid #2c2c2c;
+    font: 13px system-ui, sans-serif;
+  }
+  #siteHeader a { color: #bbb; text-decoration: none; white-space: nowrap; }
+  #siteHeader a:hover { color: #fff; }
+  #siteHeader .home { color: #fff; font-weight: 600; }
+  #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
+  #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
+  #siteHeader a[aria-current="page"] { background: #2c2c2c; color: #fff; }
+  #siteHeader .about { margin-left: auto; padding: 4px 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<header id="siteHeader">
+  <a class="home" href="index.html">← sRGB 色立体</a>
+  <nav>
+    <a href="color-solid.html">点群</a>
+    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="confusion-lines.html">混同色線</a>
+    <a href="hue-slices.html" aria-current="page">色相断面</a>
+  </nav>
+  <a class="about" href="about.html">説明を見る</a>
+</header>
+
+<aside id="panel">
+  <div class="tabs" role="tablist" aria-label="パネルの表示">
+    <button role="tab" id="tabBtnView" aria-controls="tabView" aria-selected="true">操作</button>
+    <button role="tab" id="tabBtnNotes" aria-controls="tabNotes" aria-selected="false">解説</button>
+  </div>
+  <div role="tabpanel" id="tabView" aria-labelledby="tabBtnView">
+  <h2>色相 h = <span id="hueValue"></span></h2>
+  <input type="range" id="hueSlider" min="0" max="3600" value="3063" aria-label="色相角" />
+  <div class="row presets" id="presets"></div>
+
+  <figure>
+    <figcaption>断面（左: 反対側の色相 h+180° ／ 右: 色相 h）</figcaption>
+    <canvas class="chart" id="slice" width="840" height="300"></canvas>
+    <div class="axis"><span>← 彩度 C*</span><span>縦：明度 L*</span><span>彩度 C* →</span></div>
+  </figure>
+
+  <div id="cusps"></div>
+  <div id="readout">断面にカーソルを合わせると、その色の値と立体上の位置を表示します。</div>
+
+  <figure>
+    <figcaption>色相ごとの「最も鮮やかな色」の明度 L*（クリックで色相を選択）</figcaption>
+    <canvas class="chart" id="cuspChart" width="600" height="220"></canvas>
+  </figure>
+
+  <h2>表示</h2>
+  <div class="row">
+    <button class="switch" role="switch" aria-checked="true" id="toggleSpin"><span class="track" aria-hidden="true"></span>色相を回す</button>
+    <button class="switch" role="switch" aria-checked="true" id="toggleShell"><span class="track" aria-hidden="true"></span>外殻</button>
+    <button class="switch" role="switch" aria-checked="true" id="toggleRotate"><span class="track" aria-hidden="true"></span>自動回転</button>
+  </div>
+
+  </div>
+
+  <div role="tabpanel" id="tabNotes" aria-labelledby="tabBtnNotes" hidden>
+  <h2>断面の見方</h2>
+  <p class="note">
+    断面は、黒（下）・白（上）・その色相で最も鮮やかな色（頂点）を結んだ三角形に近い形になります。
+    頂点の高さが色相ごとに違うのが、「色相ごとに固有の明度がある」ということです。
+    黄は白に近い明るさで最も鮮やかになり、青紫は暗いところで最も鮮やかになります。
+    3D の色つきのリングは、全色相の頂点をつないだ線です。
+  </p>
+  <h2>PCCS との関係</h2>
+  <p class="note">
+    PCCS の色相環でも純色の明度は色相によって違い、黄が最も高く、青紫のあたりが最も低くなります。
+    なお、CIELAB で反対方向にある色相は、PCCS の補色とは必ずしも一致しません。
+    <a href="about.html">説明を見る</a>
+  </p>
+  </div>
+</aside>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+// ============================================================
+// 1. 色変換
+// ============================================================
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function linearToSrgb(c) {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+function mul(m, v) {
+  return m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+}
+
+// sRGB(D65) <-> CIE XYZ
+const M = [
+  [0.4124564, 0.3575761, 0.1804375],
+  [0.2126729, 0.7151522, 0.0721750],
+  [0.0193339, 0.1191920, 0.9503041]
+];
+const M_INV = [
+  [ 3.2404542, -1.5371385, -0.4985314],
+  [-0.9692660,  1.8760108,  0.0415560],
+  [ 0.0556434, -0.2040259,  1.0572252]
+];
+
+// D65 白色点
+const WHITE_XYZ = [0.95047, 1.0, 1.08883];
+const DELTA = 6 / 29;
+const labF = (t) => (t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29);
+const labFInv = (t) => (t > DELTA ? t * t * t : 3 * DELTA * DELTA * (t - 4 / 29));
+
+function linearToLab(lin) {
+  const [X, Y, Z] = mul(M, lin);
+  const fx = labF(X / WHITE_XYZ[0]), fy = labF(Y / WHITE_XYZ[1]), fz = labF(Z / WHITE_XYZ[2]);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+function labToLinear(L, a, b) {
+  const fy = (L + 16) / 116;
+  return mul(M_INV, [
+    WHITE_XYZ[0] * labFInv(fy + a / 500),
+    WHITE_XYZ[1] * labFInv(fy),
+    WHITE_XYZ[2] * labFInv(fy - b / 200)
+  ]);
+}
+
+const DEG = Math.PI / 180;
+const hueOf = (a, b) => ((Math.atan2(b, a) / DEG) + 360) % 360;
+const to8bit = (c) => Math.round(255 * linearToSrgb(Math.min(1, Math.max(0, c))));
+const hex = (lin) => "#" + lin.map((c) => to8bit(c).toString(16).padStart(2, "0")).join("");
+const isInside = (lin) => lin.every((c) => c >= -1e-6 && c <= 1 + 1e-6);
+
+// 表示座標（他のページの CIELAB と同じ割り当て。L* は -1.5〜4.5、b* は -Z 方向）
+function labToScene(L, a, b) {
+  return new THREE.Vector3(a * 0.025, (L / 100) * 6 - 1.5, -b * 0.025);
+}
+
+// ============================================================
+// 2. 各色相の頂点（最も鮮やかな色）
+//
+// sRGB で彩度が最大になる色は、RGB 立方体の「1チャンネルが1・1チャンネルが0」の辺
+// （赤→黄→緑→シアン→青→マゼンタ→赤 の6辺）の上にある。
+// この辺を細かくたどって、色相ごとの頂点の L*・C* を表にする。
+// ============================================================
+const EDGE_STEPS = 240;
+const CORNERS = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]];
+
+const cuspLoop = []; // 辺をたどった順（3D のリング用）
+for (let e = 0; e < 6; e++) {
+  const A = CORNERS[e], B = CORNERS[(e + 1) % 6];
+  for (let i = 0; i < EDGE_STEPS; i++) {
+    const t = i / EDGE_STEPS;
+    const lin = A.map((c, k) => srgbToLinear(c + (B[k] - c) * t));
+    const [L, a, b] = linearToLab(lin);
+    cuspLoop.push({ h: hueOf(a, b), L, C: Math.hypot(a, b), a, b, lin });
+  }
+}
+const cuspByHue = [...cuspLoop].sort((p, q) => p.h - q.h);
+
+// 色相 h の頂点を、前後の表の値から補間して求める
+function cuspAt(h) {
+  h = ((h % 360) + 360) % 360;
+  const n = cuspByHue.length;
+  let hi = cuspByHue.findIndex((p) => p.h >= h);
+  if (hi === -1) hi = 0;
+  const lo = (hi - 1 + n) % n;
+  const p = cuspByHue[lo], q = cuspByHue[hi];
+  const span = ((q.h - p.h) + 360) % 360 || 1e-9;
+  const k = (((h - p.h) + 360) % 360) / span;
+  const lin = p.lin.map((c, i) => c + (q.lin[i] - c) * k);
+  return { h, L: p.L + (q.L - p.L) * k, C: p.C + (q.C - p.C) * k, lin };
+}
+
+// 主な色相（sRGB の原色と2次色）
+const PRESETS = [
+  ["赤", [1, 0, 0]], ["黄", [1, 1, 0]], ["緑", [0, 1, 0]],
+  ["シアン", [0, 1, 1]], ["青", [0, 0, 1]], ["マゼンタ", [1, 0, 1]]
+].map(([name, lin]) => {
+  const [, a, b] = linearToLab(lin);
+  return { name, lin, h: hueOf(a, b) };
+});
+
+// ============================================================
+// 3. 断面の画像（横: -C_MAX〜+C_MAX、縦: L* 0〜100。縦横の縮尺は同じ）
+// ============================================================
+const C_MAX = 140;
+const sliceCanvas = document.getElementById("slice");
+const SW = sliceCanvas.width, SH = sliceCanvas.height;
+const sliceCtx = sliceCanvas.getContext("2d");
+const sliceImg = sliceCtx.createImageData(SW, SH);
+
+// 断面上の (u, v)（0〜1、v=0 が上）→ L*, 符号つき C*, 線形RGB
+function sampleSlice(hue, u, v) {
+  const Cs = (2 * u - 1) * C_MAX; // 正: 色相 h 側、負: h+180° 側
+  const L = 100 * (1 - v);
+  const a = Cs * Math.cos(hue * DEG), b = Cs * Math.sin(hue * DEG);
+  const lin = labToLinear(L, a, b);
+  return { L, Cs, a, b, lin, inside: isInside(lin) };
+}
+
+// 色域の内側への深さ（内側で正、外側で負）。ふちのアンチエイリアスに使う
+const depthBuf = new Float32Array(SW * SH);
+
+function drawSlice(hue) {
+  const d = sliceImg.data;
+  for (let py = 0; py < SH; py++) {
+    for (let px = 0; px < SW; px++) {
+      const i = py * SW + px, o = i * 4;
+      const { lin } = sampleSlice(hue, (px + 0.5) / SW, (py + 0.5) / SH);
+      depthBuf[i] = Math.min(...lin, 1 - lin[0], 1 - lin[1], 1 - lin[2]);
+      d[o] = to8bit(lin[0]); d[o + 1] = to8bit(lin[1]); d[o + 2] = to8bit(lin[2]);
+    }
+  }
+  // 深さ ÷ 1ピクセルあたりの変化量 ≒ 境界までのピクセル距離。境界をまたぐピクセルだけ半透明にする
+  for (let py = 0; py < SH; py++) {
+    for (let px = 0; px < SW; px++) {
+      const i = py * SW + px;
+      const f = depthBuf[i];
+      const gx = (depthBuf[px < SW - 1 ? i + 1 : i] - depthBuf[px > 0 ? i - 1 : i]) / 2;
+      const gy = (depthBuf[py < SH - 1 ? i + SW : i] - depthBuf[py > 0 ? i - SW : i]) / 2;
+      const alpha = 0.5 + f / (Math.abs(gx) + Math.abs(gy) + 1e-9);
+      d[i * 4 + 3] = Math.round(255 * Math.min(1, Math.max(0, alpha)));
+    }
+  }
+  sliceCtx.putImageData(sliceImg, 0, 0);
+
+  // 頂点の位置に印をつける
+  for (const [hh, side] of [[hue, 1], [hue + 180, -1]]) {
+    const c = cuspAt(hh);
+    const x = ((side * c.C) / C_MAX + 1) / 2 * SW;
+    const y = (1 - c.L / 100) * SH;
+    sliceCtx.beginPath();
+    sliceCtx.arc(x, y, 7, 0, Math.PI * 2);
+    sliceCtx.lineWidth = 3;
+    sliceCtx.strokeStyle = "#000";
+    sliceCtx.stroke();
+    sliceCtx.beginPath();
+    sliceCtx.arc(x, y, 5, 0, Math.PI * 2);
+    sliceCtx.strokeStyle = "#fff";
+    sliceCtx.stroke();
+  }
+}
+
+// ============================================================
+// 4. 色相と頂点の明度のグラフ
+// ============================================================
+const chart = document.getElementById("cuspChart");
+const chartCtx = chart.getContext("2d");
+const CW = chart.width, CH = chart.height;
+const PAD = { l: 52, r: 10, t: 14, b: 40 };
+const chartX = (h) => PAD.l + (h / 360) * (CW - PAD.l - PAD.r);
+const chartY = (L) => PAD.t + (1 - L / 100) * (CH - PAD.t - PAD.b);
+
+function drawChart(hue) {
+  const ctx = chartCtx;
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.font = "24px system-ui, sans-serif"; // 表示時は約半分の大きさになる
+  ctx.lineWidth = 1;
+
+  // 目盛り
+  for (const L of [0, 25, 50, 75, 100]) {
+    ctx.strokeStyle = "#2c2c2c";
+    ctx.beginPath(); ctx.moveTo(PAD.l, chartY(L)); ctx.lineTo(CW - PAD.r, chartY(L)); ctx.stroke();
+    ctx.fillStyle = "#888";
+    ctx.textAlign = "right";
+    ctx.fillText(String(L), PAD.l - 8, chartY(L) + 8);
+  }
+  ctx.textAlign = "center";
+  for (const p of PRESETS) {
+    ctx.fillStyle = hex(p.lin);
+    ctx.fillText(p.name.slice(0, 1), chartX(p.h), CH - 10);
+  }
+
+  // 頂点の明度（線の色はその色相の頂点の色）
+  ctx.lineWidth = 4;
+  for (let i = 1; i < cuspByHue.length; i++) {
+    const p = cuspByHue[i - 1], q = cuspByHue[i];
+    ctx.strokeStyle = hex(q.lin);
+    ctx.beginPath(); ctx.moveTo(chartX(p.h), chartY(p.L)); ctx.lineTo(chartX(q.h), chartY(q.L)); ctx.stroke();
+  }
+
+  // 選んでいる色相（実線）と反対側（破線）
+  ctx.lineWidth = 1.5;
+  for (const [hh, dash] of [[hue, []], [(hue + 180) % 360, [5, 4]]]) {
+    ctx.setLineDash(dash);
+    ctx.strokeStyle = "#fff";
+    ctx.beginPath(); ctx.moveTo(chartX(hh), PAD.t); ctx.lineTo(chartX(hh), CH - PAD.b); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+// ============================================================
+// 5. 3D シーン
+// ============================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+camera.position.set(4.5, 5.0, 7.5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.domElement.id = "view";
+document.body.prepend(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+controls.minDistance = 1.5;
+controls.maxDistance = 30;
+
+// --- sRGB 色域の外殻（半透明。color-solid-mesh.html と同じ構成で CIELAB のみ） ---
+function buildShell(S = 32) {
+  const positions = [], colors = [], indices = [];
+  let count = 0;
+  const patch = (nu, nv, sample) => {
+    const base = count;
+    for (let j = 0; j <= nv; j++) {
+      for (let i = 0; i <= nu; i++) {
+        const lin = sample(i / nu, j / nv);
+        const p = labToScene(...linearToLab(lin));
+        positions.push(p.x, p.y, p.z);
+        colors.push(lin[0], lin[1], lin[2]);
+        count++;
+      }
+    }
+    for (let j = 0; j < nv; j++) {
+      for (let i = 0; i < nu; i++) {
+        const a = base + j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+  };
+  // 立方体の6面（チャンネル k を 0 または 1 に固定）
+  for (let k = 0; k < 3; k++) {
+    const [p, q] = [0, 1, 2].filter((c) => c !== k);
+    for (const fixed of [0, 1]) {
+      patch(S, S, (u, v) => {
+        const enc = [0, 0, 0];
+        enc[k] = fixed; enc[p] = u; enc[q] = v;
+        return enc.map(srgbToLinear);
+      });
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  g.setIndex(indices);
+  return g;
+}
+
+const shell = new THREE.Mesh(
+  buildShell(),
+  new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, opacity: 0.14,
+    depthWrite: false, side: THREE.DoubleSide
+  })
+);
+scene.add(shell);
+
+// --- 無彩色軸（黒〜白） ---
+scene.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([labToScene(0, 0, 0), labToScene(100, 0, 0)]),
+  new THREE.LineBasicMaterial({ color: 0x999999 })
+));
+
+// --- 頂点のリング（全色相の最も鮮やかな色をつないだ線） ---
+{
+  const g = new THREE.BufferGeometry().setFromPoints(
+    [...cuspLoop, cuspLoop[0]].map((p) => labToScene(p.L, p.a, p.b))
+  );
+  g.setAttribute("color", new THREE.Float32BufferAttribute(
+    [...cuspLoop, cuspLoop[0]].flatMap((p) => p.lin), 3
+  ));
+  scene.add(new THREE.Line(g, new THREE.LineBasicMaterial({ vertexColors: true })));
+}
+
+// --- 断面（縦の面。色相 h と h+180° をつないだ1枚） ---
+const sliceTexture = new THREE.CanvasTexture(sliceCanvas);
+sliceTexture.colorSpace = THREE.SRGBColorSpace;
+sliceTexture.generateMipmaps = false;
+sliceTexture.minFilter = THREE.LinearFilter;
+
+const sliceGeometry = new THREE.BufferGeometry();
+sliceGeometry.setAttribute("position", new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+sliceGeometry.setAttribute("uv", new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+sliceGeometry.setIndex([0, 1, 2, 0, 2, 3]);
+const sliceMesh = new THREE.Mesh(
+  sliceGeometry,
+  // ふちを半透明にしたので透過で描く。断面を先に描き、半透明の外殻を後から重ねる
+  new THREE.MeshBasicMaterial({ map: sliceTexture, transparent: true, alphaTest: 0.02, side: THREE.DoubleSide })
+);
+sliceMesh.frustumCulled = false;
+sliceMesh.renderOrder = 0;
+shell.renderOrder = 1;
+scene.add(sliceMesh);
+
+function placeSlice(hue) {
+  const ca = Math.cos(hue * DEG) * C_MAX, sb = Math.sin(hue * DEG) * C_MAX;
+  const corners = [
+    labToScene(0, -ca, -sb), labToScene(0, ca, sb),
+    labToScene(100, ca, sb), labToScene(100, -ca, -sb)
+  ];
+  const pos = sliceGeometry.attributes.position;
+  corners.forEach((p, i) => pos.setXYZ(i, p.x, p.y, p.z));
+  pos.needsUpdate = true;
+}
+
+// --- 頂点とカーソル位置の目印 ---
+function makeMarker(radius) {
+  const m = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  m.add(new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 1.5, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide })
+  ));
+  scene.add(m);
+  return m;
+}
+const cuspMarkers = [makeMarker(0.06), makeMarker(0.06)];
+const hoverMarker = makeMarker(0.06);
+hoverMarker.visible = false;
+
+// ============================================================
+// 6. 状態と更新
+// ============================================================
+const slider = document.getElementById("hueSlider");
+const hueValue = document.getElementById("hueValue");
+const cuspsBox = document.getElementById("cusps");
+const readout = document.getElementById("readout");
+const READOUT_DEFAULT = readout.innerHTML;
+
+let hue = slider.value / 10;
+
+function cuspLine(label, c) {
+  return `${label}（h ${c.h.toFixed(1)}°）頂点<span class="sw" style="background:${hex(c.lin)}"></span>` +
+    `L* <strong>${c.L.toFixed(1)}</strong>　C* ${c.C.toFixed(1)}`;
+}
+
+function update() {
+  hueValue.textContent = `${hue.toFixed(1)}°`;
+  drawSlice(hue);
+  sliceTexture.needsUpdate = true;
+  placeSlice(hue);
+  drawChart(hue);
+
+  const right = cuspAt(hue), left = cuspAt(hue + 180);
+  cuspMarkers[0].position.copy(labToScene(right.L, right.C * Math.cos(hue * DEG), right.C * Math.sin(hue * DEG)));
+  cuspMarkers[1].position.copy(labToScene(left.L, -left.C * Math.cos(hue * DEG), -left.C * Math.sin(hue * DEG)));
+  cuspsBox.innerHTML =
+    cuspLine("右", right) + "<br>" + cuspLine("左", left) +
+    `<br>頂点の明度差 ΔL* ${Math.abs(right.L - left.L).toFixed(1)}`;
+}
+
+function setHue(h) {
+  hue = ((h % 360) + 360) % 360;
+  slider.value = Math.round(hue * 10);
+  update();
+}
+
+slider.addEventListener("input", () => {
+  hue = slider.value / 10;
+  update();
+});
+
+// 主な色相のボタン
+const presetBox = document.getElementById("presets");
+for (const p of PRESETS) {
+  const b = document.createElement("button");
+  b.innerHTML = `<span class="dot" style="background:${hex(p.lin)}"></span>${p.name}`;
+  b.addEventListener("click", () => setHue(p.h));
+  presetBox.append(b);
+}
+
+// グラフのクリックで色相を選ぶ
+function chartHue(e) {
+  const r = chart.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * CW;
+  return Math.min(360, Math.max(0, ((x - PAD.l) / (CW - PAD.l - PAD.r)) * 360));
+}
+chart.addEventListener("pointerdown", (e) => {
+  setHue(chartHue(e));
+  chart.setPointerCapture(e.pointerId);
+});
+chart.addEventListener("pointermove", (e) => {
+  if (chart.hasPointerCapture(e.pointerId)) setHue(chartHue(e));
+});
+
+// 断面上のカーソル：色の値と 3D 上の位置を表示
+function onSliceHover(e) {
+  const r = sliceCanvas.getBoundingClientRect();
+  const u = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const v = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  const { L, Cs, a, b, lin, inside } = sampleSlice(hue, u, v);
+  if (!inside) {
+    hoverMarker.visible = false;
+    readout.textContent = "ここは sRGB の色域の外です。";
+    return;
+  }
+  hoverMarker.position.copy(labToScene(L, a, b));
+  hoverMarker.visible = true;
+  const h = Cs >= 0 ? hue : (hue + 180) % 360;
+  readout.innerHTML =
+    `L* ${L.toFixed(1)}　C* ${Math.abs(Cs).toFixed(1)}　h ${h.toFixed(1)}°` +
+    `<span class="sw" style="background:${hex(lin)}"></span>${hex(lin)}`;
+}
+sliceCanvas.addEventListener("pointermove", onSliceHover);
+sliceCanvas.addEventListener("pointerdown", onSliceHover);
+sliceCanvas.addEventListener("pointerleave", () => {
+  hoverMarker.visible = false;
+  readout.innerHTML = READOUT_DEFAULT;
+});
+
+// 表示ボタン
+// スイッチ：aria-checked で状態を持ち、押すたびに反転して onChange(状態) を呼ぶ
+function bindSwitch(id, onChange) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", () => {
+    const on = el.getAttribute("aria-checked") !== "true";
+    el.setAttribute("aria-checked", String(on));
+    onChange(on);
+  });
+}
+
+// セグメント：押したボタンだけ aria-pressed="true" にして onSelect(data-value) を呼ぶ
+function bindSegment(id, onSelect) {
+  const buttons = [...document.getElementById(id).querySelectorAll("button")];
+  for (const b of buttons) {
+    b.addEventListener("click", () => {
+      for (const x of buttons) x.setAttribute("aria-pressed", String(x === b));
+      onSelect(b.dataset.value);
+    });
+  }
+}
+
+let spinning = true;
+bindSwitch("toggleSpin", (on) => { spinning = on; });
+
+bindSwitch("toggleShell", (on) => { shell.visible = on; });
+
+bindSwitch("toggleRotate", (on) => { controls.autoRotate = on; });
+
+// 初期表示：青（右）と反対側の黄緑（左）—— 頂点の高さの違いがいちばん大きい組み合わせ
+setHue(PRESETS[4].h);
+
+// 断面を正面から、右側（色相 h）が画面の右に来る向きで見る
+camera.position.set(
+  Math.sin(hue * DEG) * 11.5,
+  controls.target.y + 3,
+  Math.cos(hue * DEG) * 11.5
+);
+
+// ============================================================
+// 7. レイアウトと描画
+// ============================================================
+const panel = document.getElementById("panel");
+
+// パネルに隠れない位置に立体が来るよう、投影の中心をずらす
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  const r = panel.getBoundingClientRect();
+  if (w > 760) {
+    const p = r.width + 12;
+    camera.aspect = (w + p) / h;
+    camera.setViewOffset(w + p, h, p, 0, w, h);
+  } else {
+    const p = Math.min(r.height + 8, h * 0.5);
+    camera.aspect = w / (h + p);
+    camera.setViewOffset(w, h + p, 0, p, w, h);
+  }
+  camera.updateProjectionMatrix();
+}
+layout();
+window.addEventListener("resize", layout);
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (spinning) setHue(hue + dt * 30); // 1秒に30°
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+// パネルのタブ（操作 / 解説）。切り替えでパネルの高さが変わるので配置も更新する
+const panelTabs = [...document.querySelectorAll('#panel [role="tab"]')];
+for (const tab of panelTabs) {
+  tab.addEventListener("click", () => {
+    for (const t of panelTabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    }
+    layout();
+  });
+}
+</script>
+
+</body>
+</html>

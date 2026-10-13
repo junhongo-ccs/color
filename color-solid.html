@@ -13,10 +13,32 @@
     background: rgba(0,0,0,.55); padding: 10px 12px; border-radius: 8px;
     line-height: 1.8;
   }
-  button {
-    font: inherit; margin-right: 8px; padding: 4px 10px;
-    border: 0; border-radius: 6px; cursor: pointer;
+  button { font: inherit; border: 0; cursor: pointer; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 4px; }
+  /* 操作部品：ON/OFF はスイッチ、択一はセグメントボタン（状態と操作を取り違えないように） */
+  .switch {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 6px; background: none; color: #ddd;
   }
+  .switch:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .switch .track {
+    position: relative; flex: none; width: 34px; height: 20px; border-radius: 10px;
+    background: #4a4a4a; transition: background .15s;
+  }
+  .switch .track::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px;
+    border-radius: 50%; background: #bbb; transition: transform .15s, background .15s;
+  }
+  .switch[aria-checked="true"] .track { background: #4c86e8; }
+  .switch[aria-checked="true"] .track::after { transform: translateX(14px); background: #fff; }
+  .seg {
+    display: inline-flex; gap: 2px; padding: 2px;
+    background: #1c1c1c; border: 1px solid #333; border-radius: 8px;
+  }
+  .seg button { padding: 4px 12px; border-radius: 6px; background: none; color: #bbb; }
+  .seg button:hover { background: #2a2a2a; color: #fff; }
+  .seg button[aria-pressed="true"] { background: #e6e6e6; color: #111; font-weight: 600; }
+  button:focus-visible { outline: 2px solid #8ab4ff; outline-offset: 2px; }
   #axisLabel { color: #bbb; }
   /* 共通ヘッダー：一覧へ戻るリンクとページ切替 */
   #siteHeader {
@@ -42,15 +64,20 @@
   <nav>
     <a href="color-solid.html" aria-current="page">点群</a>
     <a href="color-solid-mesh.html">外殻メッシュ</a>
-    <a href="color-solid-marching-cubes.html">Marching Cubes</a>
-    <a href="compare-color-solids.html">比較</a>
+    <a href="confusion-lines.html">混同色線</a>
+    <a href="hue-slices.html">色相断面</a>
   </nav>
   <a class="about" href="about.html">説明を見る</a>
 </header>
 
 <div id="ui">
-  <button id="toggleSpace">表示: xyY</button>
-  <button id="toggleRotate">自動回転: ON</button>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="色空間" id="spaceSeg">
+      <button aria-pressed="true" data-value="xyY">xyY</button>
+      <button aria-pressed="false" data-value="CIELAB">CIELAB</button>
+    </div>
+    <button class="switch" role="switch" aria-checked="true" id="toggleRotate"><span class="track" aria-hidden="true"></span>自動回転</button>
+  </div>
   <span>ドラッグ: 回転 ／ ホイール: ズーム ／ 右ドラッグ: パン</span><br />
   <span id="axisLabel"></span>
 </div>
@@ -230,17 +257,37 @@ let morphFrom = null; // 切替開始時点の座標
 let morphTo = null;
 let morphT = 1;
 
-const spaceButton = document.getElementById("toggleSpace");
+// スイッチ：aria-checked で状態を持ち、押すたびに反転して onChange(状態) を呼ぶ
+function bindSwitch(id, onChange) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", () => {
+    const on = el.getAttribute("aria-checked") !== "true";
+    el.setAttribute("aria-checked", String(on));
+    onChange(on);
+  });
+}
+
+// セグメント：押したボタンだけ aria-pressed="true" にして onSelect(data-value) を呼ぶ
+function bindSegment(id, onSelect) {
+  const buttons = [...document.getElementById(id).querySelectorAll("button")];
+  for (const b of buttons) {
+    b.addEventListener("click", () => {
+      for (const x of buttons) x.setAttribute("aria-pressed", String(x === b));
+      onSelect(b.dataset.value);
+    });
+  }
+}
+
 const axisLabel = document.getElementById("axisLabel");
 axisLabel.textContent = SPACES.xyY.axes;
 
-spaceButton.addEventListener("click", () => {
-  currentSpace = currentSpace === "xyY" ? "CIELAB" : "xyY";
+bindSegment("spaceSeg", (space) => {
+  if (space === currentSpace) return;
+  currentSpace = space;
   // 切替途中で押された場合も、今の位置から滑らかに向かう
   morphFrom = positionAttr.array.slice();
   morphTo = SPACES[currentSpace].positions;
   morphT = 0;
-  spaceButton.textContent = `表示: ${currentSpace}`;
   axisLabel.textContent = SPACES[currentSpace].axes;
 });
 
@@ -274,11 +321,7 @@ animate();
 // ------------------------------------------------------------
 // 8. 自動回転のON/OFF
 // ------------------------------------------------------------
-const rotateButton = document.getElementById("toggleRotate");
-rotateButton.addEventListener("click", () => {
-  controls.autoRotate = !controls.autoRotate;
-  rotateButton.textContent = `自動回転: ${controls.autoRotate ? "ON" : "OFF"}`;
-});
+bindSwitch("toggleRotate", (on) => { controls.autoRotate = on; });
 
 // ------------------------------------------------------------
 // 9. リサイズ対応

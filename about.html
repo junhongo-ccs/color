@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sRGB 色立体ビューアについて</title>
+<style>
+  html, body { margin: 0; background: #111; color: #e6e6e6; }
+  body { font: 15px/1.85 system-ui, sans-serif; padding: 72px 16px 64px; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 24px; line-height: 1.4; margin: 0 0 12px; color: #fff; }
+  h2 {
+    font-size: 18px; margin: 48px 0 12px; padding-top: 16px; color: #fff;
+    border-top: 1px solid #2c2c2c;
+  }
+  h3 { font-size: 15px; margin: 24px 0 6px; color: #fff; }
+  p, ul { margin: 0 0 14px; }
+  ul { padding-left: 1.3em; }
+  li { margin-bottom: 4px; }
+  a { color: #8ab4ff; }
+  code {
+    font: 13px ui-monospace, SFMono-Regular, Consolas, monospace;
+    background: #1d1d1d; padding: 1px 5px; border-radius: 4px;
+  }
+  .lead { color: #bbb; font-size: 16px; }
+  .note { color: #aaa; font-size: 14px; }
+  .table-wrap { overflow-x: auto; margin: 0 0 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid #2c2c2c; }
+  th { color: #fff; font-weight: 600; white-space: nowrap; }
+  td a { white-space: nowrap; }
+
+  /* 共通ヘッダー：一覧へ戻るリンクとページ切替 */
+  #siteHeader {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
+    height: 44px; box-sizing: border-box; padding: 0 12px;
+    display: flex; align-items: center; gap: 16px;
+    background: rgba(17,17,17,.85); border-bottom: 1px solid #2c2c2c;
+    font: 13px system-ui, sans-serif;
+  }
+  #siteHeader a { color: #bbb; text-decoration: none; white-space: nowrap; }
+  #siteHeader a:hover { color: #fff; }
+  #siteHeader .home { color: #fff; font-weight: 600; }
+  #siteHeader nav { display: flex; gap: 4px; overflow-x: auto; min-width: 0; }
+  #siteHeader nav a { padding: 4px 10px; border-radius: 6px; }
+  #siteHeader a[aria-current="page"] { background: #2c2c2c; color: #fff; }
+  #siteHeader .about { margin-left: auto; padding: 4px 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<header id="siteHeader">
+  <a class="home" href="index.html">← sRGB 色立体</a>
+  <nav>
+    <a href="color-solid.html">点群</a>
+    <a href="color-solid-mesh.html">外殻メッシュ</a>
+    <a href="color-solid-marching-cubes.html">Marching Cubes</a>
+    <a href="compare-color-solids.html">比較</a>
+  </nav>
+  <a class="about" href="about.html" aria-current="page">説明を見る</a>
+</header>
+
+<main>
+  <h1>sRGB 色立体ビューアについて</h1>
+  <p class="lead">
+    パソコンやスマホの画面で表示できる色の範囲を、3次元の立体として回して眺めるためのビューアです。
+    同じ色の範囲を2つの色空間（xyY と CIELAB）で表示し、4通りの方法で描いています。
+  </p>
+
+  <h2>色立体とは</h2>
+  <p>
+    色は3つの数値で表せます。たとえば画面の色は赤・緑・青の光の強さ（RGB）の組み合わせです。
+    3つの数値を座標と見なすと、1つの色は3次元空間の1つの点になり、
+    ある方式で表せる色をすべて集めると1つの立体になります。これが<strong>色立体</strong>です。
+  </p>
+  <p>
+    このビューアが扱うのは <strong>sRGB</strong> の色立体です。sRGB は一般的なモニターや Web の標準の色の規格で、
+    その表示できる色の範囲（<strong>色域</strong>）を立体の形として見ることができます。
+    RGB のままだと単なる立方体ですが、人の色の感じ方に基づく色空間へ移すと、ゆがんだ独特の形が現れます。
+  </p>
+
+  <h2>2つの色空間</h2>
+
+  <h3>xyY（CIE 1931）</h3>
+  <ul>
+    <li><code>x</code>・<code>y</code> は色み（色度）、<code>Y</code> は明るさ（輝度）を表します。縦軸が <code>Y</code> です。</li>
+    <li>真上から見ると、教科書でおなじみの<strong>色度図の三角形</strong>になります。三角形の3つの角が sRGB の赤・緑・青の原色です。</li>
+    <li>明るくなるほど作れる色みの範囲が狭まり、最後は白の1点に向かって尖ります。</li>
+    <li>空間上の距離は見た目の色の差と一致しません。たとえば緑のあたりは実際の見え方の違い以上に広がって見えます。</li>
+  </ul>
+
+  <h3>CIELAB（L*a*b*）</h3>
+  <ul>
+    <li><code>L*</code> は明るさ（明度）、<code>a*</code> は緑↔赤、<code>b*</code> は青↔黄を表します。縦軸が <code>L*</code> です。</li>
+    <li>空間上の距離が<strong>見た目の色の差</strong>にほぼ比例するように作られた色空間です。</li>
+    <li>黒と白は中心の縦軸の下端と上端の1点になり、原色は外側に張り出した角になります。</li>
+    <li>
+      黄色は明るい位置で、青は暗い位置で大きく外へ張り出します。
+      色みによって、最も鮮やかになる明るさが違うことが形から分かります。
+    </li>
+  </ul>
+  <p class="note">
+    各ページの「表示」ボタンで、同じ色の範囲が xyY と CIELAB の間で滑らかに変形する様子を見られます。
+  </p>
+
+  <h2>4つの表示</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>ページ</th><th>作り方</th><th>見どころ</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="color-solid.html">点群</a></td>
+          <td>RGB の各チャンネルを18段階に分けた5,832色を、それぞれ点として配置します。</td>
+          <td>立体の内側まで色が詰まっている様子が見えます。点の間隔の偏りから、空間のゆがみ方も分かります。</td>
+        </tr>
+        <tr>
+          <td><a href="color-solid-mesh.html">外殻メッシュ</a></td>
+          <td>RGB 立方体の6つの面を、そのまま色空間へ写した面です。</td>
+          <td>色域の境界を正確に表します。各面の色は、その位置で表せる最も外側の色です。</td>
+        </tr>
+        <tr>
+          <td><a href="color-solid-marching-cubes.html">Marching Cubes</a></td>
+          <td>空間を細かい立方体（ボクセル）に区切り、色域の内と外の境目を面として取り出します。</td>
+          <td>陰影付きで形の凹凸が分かりやすくなります。</td>
+        </tr>
+        <tr>
+          <td><a href="compare-color-solids.html">比較</a></td>
+          <td>外殻メッシュと Marching Cubes を同じ視点で並べます。</td>
+          <td>Marching Cubes の解像度を変えると、角の削れ方や面の粗さが変わる様子を比べられます。</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>しくみ</h2>
+
+  <h3>外殻メッシュ：立方体の面がそのまま境界になる</h3>
+  <p>
+    RGB の値を CIE XYZ に変換する計算は、行列をかけるだけの線形な変換で、別々の色が同じ点に重なることはありません。
+    そのため、<strong>RGB 立方体の表面がそのまま色域の境界</strong>になります。
+  </p>
+  <ul>
+    <li><code>R=1</code>・<code>G=1</code>・<code>B=1</code> の3面は、それぞれの色みで出せる<strong>最も明るい色</strong>からなる上側の面です。</li>
+    <li><code>R=0</code>・<code>G=0</code>・<code>B=0</code> の3面は、xyY では色度図の三角形の辺に沿って立つ垂直な壁になります（2つの原色を混ぜただけの色は、色度図上で2つの原色を結ぶ線の上に乗るため）。</li>
+    <li>黒の1点は、xyY では明るさ0の底面（三角形）全体に広がり、CIELAB では1点のままです。</li>
+  </ul>
+
+  <h3>Marching Cubes：内側かどうかを測って面を取り出す</h3>
+  <p>
+    空間内の各点を RGB に逆変換し、「RGB 立方体の内側にどれだけ入り込んでいるか」を
+    <code>min(r, g, b, 1−r, 1−g, 1−b)</code> で計算します。
+    この値は色域の内側で正、外側で負になり、ちょうど0になる場所が色域の境界です。
+    Marching Cubes 法は、この値が0になる面を三角形の集まりとして取り出します。
+  </p>
+  <p>
+    逆変換さえできれば、どんな色空間でも同じ手順で形を作れるのが利点です。
+    一方で、ボクセルより細かい形は表せないため、白や原色の鋭い角が少し削れます。
+  </p>
+
+  <h2>操作方法</h2>
+  <ul>
+    <li><strong>ドラッグ</strong>：回転</li>
+    <li><strong>ホイール／ピンチ</strong>：ズーム</li>
+    <li><strong>右ドラッグ／2本指ドラッグ</strong>：平行移動</li>
+    <li><strong>表示</strong>：xyY と CIELAB を切り替え</li>
+    <li><strong>陰影</strong>：光を当てて形を見やすくする表示と、色そのものを見る表示を切り替え</li>
+    <li><strong>ワイヤーフレーム</strong>：面を作っている三角形の網目を表示</li>
+    <li><strong>MC解像度</strong>（比較ページ）：Marching Cubes のボクセルの細かさ</li>
+    <li><strong>自動回転</strong>：ゆっくり回し続けるかどうか</li>
+  </ul>
+
+  <h2>表示についての注意</h2>
+  <ul>
+    <li>点や面の色は、その位置が表す sRGB の色そのものです。ただし陰影を ON にすると、形を見やすくするため明るさが変わります。</li>
+    <li>見やすさのため軸ごとに拡大率を調整しているので、xyY と CIELAB の立体の大きさをそのまま比べることはできません。</li>
+    <li>白色点は D65、sRGB の変換式は IEC 61966-2-1 に従っています。</li>
+    <li>表示されるのはお使いの画面で再現できる色です。広い色域のモニターで見ても、ここで描いているのは sRGB の範囲です。</li>
+  </ul>
+
+  <h2>技術情報</h2>
+  <p>
+    <a href="https://threejs.org/">Three.js</a>（r169）で描画し、色の変換やメッシュの生成はすべてブラウザ内で計算しています。
+    ソースコードは <a href="https://github.com/junhongo-ccs/color">GitHub</a> で公開しています。
+  </p>
+</main>
+
+</body>
+</html>

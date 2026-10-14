@@ -160,7 +160,7 @@
     <span class="ctl-label">3Dの断面の色</span>
     <div class="seg" role="group" aria-label="3Dの断面の色" id="sliceSeg">
       <button aria-pressed="true" data-value="actual">一般の見え方</button>
-      <button aria-pressed="false" data-value="sim" id="sliceSegSim">2型の見え方</button>
+      <button aria-pressed="false" data-value="sim" id="sliceSegSim">1型の見え方</button>
     </div>
   </div>
 
@@ -175,7 +175,7 @@
     <canvas class="slice" id="sliceActual" width="384" height="288"></canvas>
   </figure>
   <figure>
-    <figcaption id="simCaption">断面：2型の見え方（シミュレーション）</figcaption>
+    <figcaption id="simCaption">断面：1型の見え方（シミュレーション）</figcaption>
     <canvas class="slice" id="sliceSim" width="384" height="288"></canvas>
     <div class="axis"><span>← 混同色中心の側</span><span>縦：明るさ Y（上が明るい）</span></div>
   </figure>
@@ -586,7 +586,7 @@ const simCaption = document.getElementById("simCaption");
 const readout = document.getElementById("readout");
 const READOUT_DEFAULT = readout.innerHTML;
 
-let typeKey = "D";
+let typeKey = "P";
 let currentLine = null;
 
 function update() {
@@ -691,8 +691,8 @@ bindSwitch("toggleShell", (on) => { shell.visible = on; });
 
 bindSwitch("toggleRotate", (on) => { controls.autoRotate = on; });
 
-// 初期表示：2型、白色点（灰色）を通る線 —— 緑と灰色が同じ面に乗る
-setType("D");
+// 初期表示：1型、白色点（灰色）を通る線 —— 赤みの色と灰色と青緑が同じ面に乗る
+setType("P");
 document.getElementById("throughWhite").click();
 
 // ============================================================

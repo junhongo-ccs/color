@@ -6,13 +6,13 @@
 <!-- favicon（favicon.png は仮。同じファイル名で上書きすれば差し替わる） -->
 <link rel="icon" type="image/png" href="favicon.png" />
 <title>色度図の立体を面で見る | xy色度図を立体で見る</title>
-<meta name="description" content="画面で出せる色の範囲（色域）の外側を、なめらかな面で正確に描きます。xyY と CIELAB を切り替えて形の違いを比べられます。" />
+<meta name="description" content="物の色としてありうる色の範囲（物体色の立体）の外側を、なめらかな面で描きます。xyY と CIELAB を切り替えて形の違いを比べられます。" />
 <!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="xy色度図を立体で見る" />
 <meta property="og:locale" content="ja_JP" />
 <meta property="og:title" content="色度図の立体を面で見る | xy色度図を立体で見る" />
-<meta property="og:description" content="画面で出せる色の範囲（色域）の外側を、なめらかな面で正確に描きます。xyY と CIELAB を切り替えて形の違いを比べられます。" />
+<meta property="og:description" content="物の色としてありうる色の範囲（物体色の立体）の外側を、なめらかな面で描きます。xyY と CIELAB を切り替えて形の違いを比べられます。" />
 <meta property="og:url" content="https://junhongo-ccs.github.io/color/color-solid-mesh.html" />
 <meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
 <meta property="og:image:width" content="1200" />
@@ -118,131 +118,46 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 // スペクトル軌跡のデータ（CIE、CC BY-SA 4.0。出典はデータファイルの先頭を参照）
 import { SPECTRAL_LOCUS } from "./data/cie1931-spectral-locus.js";
+// 物体色の立体の計算（全ページ共通）
+import { buildSurface, displayLinear, xyzToLab, chromaticity, WHITE_XYZ } from "./js/object-color-solid.js";
 
 // ------------------------------------------------------------
-// 1. 色変換
-// ------------------------------------------------------------
-function srgbToLinear(c) {
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-}
-
-// sRGB(D65) -> CIE XYZ
-const M = [
-  [0.4124564, 0.3575761, 0.1804375],
-  [0.2126729, 0.7151522, 0.0721750],
-  [0.0193339, 0.1191920, 0.9503041]
-];
-
-function linearToXYZ([r, g, b]) {
-  return M.map((row) => row[0] * r + row[1] * g + row[2] * b);
-}
-
-// D65 白色点
-const WHITE_XYZ = [0.95047, 1.0, 1.08883];
-
-const DELTA = 6 / 29;
-function labF(t) {
-  return t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29;
-}
-
-// ------------------------------------------------------------
-// 2. sRGB立方体の6面を外殻メッシュにする
+// 1. 物体色の立体の表面をメッシュにする
 //
-// RGB→XYZ は線形な1対1写像なので、立方体の表面がそのまま色域の外殻になる。
-//   ・R=1, G=1, B=1 の3面 … 上側の面（その色度で最も明るい色）
-//   ・R=0, G=0, B=0 の3面 … xyY では色度三角形の各辺に立つ垂直の壁
-//   ・黒の頂点           … xyY では Y=0 の色度三角形（底面）に広がる
+// 表面は、反射率が 0 か 1 だけの最適色でできている（js/object-color-solid.js を参照）。
+//   ・xyY では、真上から見た輪郭がスペクトル軌跡と純紫軌跡の馬蹄形になる
+//   ・黒の頂点は、xyY では Y=0 の馬蹄形（底面）に広がり、CIELAB では黒の1点に縮退する
 // ------------------------------------------------------------
-const S = 48; // 1面あたりの分割数
-
 const xyyPositions = [];
 const labPositions = [];
 const colors = [];
-const indices = [];
 let vertexCount = 0;
 
-// lin: この頂点の線形RGB
-// chromaLin: xyY の色度を求めるための線形RGB（黒に近い壁で色度を保つため）
-function pushVertex(lin, chromaLin = lin) {
-  const [X, Y, Z] = linearToXYZ(lin);
-  const [cX, cY, cZ] = linearToXYZ(chromaLin);
-  const sum = cX + cY + cZ;
-  const x = cX / sum;
-  const y = cY / sum;
-
-  const fx = labF(X / WHITE_XYZ[0]);
-  const fy = labF(Y / WHITE_XYZ[1]);
-  const fz = labF(Z / WHITE_XYZ[2]);
-  const L = 116 * fy - 16;
-  const A = 500 * (fx - fy);
-  const B = 200 * (fy - fz);
+// xyz: この頂点の XYZ、xy: xyY での色度（黒は色度が決まらないので、呼び出し側で指定する）
+function pushVertex(xyz, [x, y]) {
+  const [L, A, B] = xyzToLab(xyz);
 
   // 明るさ（Y / L*）はどちらも -1.5〜4.5 に揃える。
   // 色度 y と b* は -Z 方向に置き、真上から見たとき色度図・a*b*平面と同じ向きにする。
-  xyyPositions.push((x - 0.33) * 8, Y * 6 - 1.5, -(y - 0.33) * 8);
+  xyyPositions.push((x - 0.33) * 8, xyz[1] * 6 - 1.5, -(y - 0.33) * 8);
   labPositions.push(A * 0.025, (L / 100) * 6 - 1.5, -B * 0.025);
 
-  // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する
+  // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する。
+  // sRGB で出せない色は、近い色に置き換えて塗る
+  const lin = displayLinear(xyz);
   colors.push(lin[0], lin[1], lin[2]);
   return vertexCount++;
 }
 
-// (nu+1)×(nv+1) の格子パッチを追加。sample(u, v) は { lin, chroma? } を返す
-function addPatch(nu, nv, sample) {
-  const base = vertexCount;
-  for (let j = 0; j <= nv; j++) {
-    for (let i = 0; i <= nu; i++) {
-      const { lin, chroma } = sample(i / nu, j / nv);
-      pushVertex(lin, chroma);
-    }
-  }
-  const row = nu + 1;
-  for (let j = 0; j < nv; j++) {
-    for (let i = 0; i < nu; i++) {
-      const a = base + j * row + i;
-      const b = a + 1;
-      const c = a + row;
-      const d = c + 1;
-      indices.push(a, c, b, b, c, d);
-    }
-  }
-}
+const shell = buildSurface();
+for (const v of shell.vertices) pushVertex(v.xyz, v.xy);
+const indices = shell.indices.slice();
 
-const toLinear = (enc) => enc.map(srgbToLinear);
-
-// 上側の3面：チャンネル k を 1 に固定し、残り2チャンネルを sRGB 値で均等に分割
-for (let k = 0; k < 3; k++) {
-  const [p, q] = [0, 1, 2].filter((c) => c !== k);
-  addPatch(S, S, (u, v) => {
-    const enc = [0, 0, 0];
-    enc[k] = 1;
-    enc[p] = u;
-    enc[q] = v;
-    return { lin: toLinear(enc) };
-  });
-}
-
-// 壁の3面：チャンネル k が 0 の面を「黒からの光線」として張る。
-//   t: 原色p → p+q の混色 → 原色q と上側の縁をたどる
-//   s: 黒(0) → 縁(1) の明るさ。線形RGBでスケールするので色度は光線上で一定
-for (let k = 0; k < 3; k++) {
-  const [p, q] = [0, 1, 2].filter((c) => c !== k);
-  addPatch(2 * S, S, (t, s) => {
-    const enc = [0, 0, 0];
-    enc[p] = t < 0.5 ? 1 : 2 - 2 * t;
-    enc[q] = t < 0.5 ? 2 * t : 1;
-    const edge = toLinear(enc);
-    const sLin = srgbToLinear(s);
-    return { lin: edge.map((c) => c * sLin), chroma: edge };
-  });
-}
-
-// 底面：xyY では Y=0 の色度三角形、CIELAB では黒の1点に縮退する
+// 底面：xyY では Y=0 の馬蹄形、CIELAB では黒の1点に縮退する（白色点の色度を中心に扇形に張る）
 {
-  const r = pushVertex([0, 0, 0], [1, 0, 0]);
-  const g = pushVertex([0, 0, 0], [0, 1, 0]);
-  const b = pushVertex([0, 0, 0], [0, 0, 1]);
-  indices.push(r, g, b);
+  const center = pushVertex([0, 0, 0], chromaticity(WHITE_XYZ));
+  const ring = shell.bottomRing;
+  for (let i = 0; i < ring.length; i++) indices.push(center, ring[(i + 1) % ring.length], ring[i]);
 }
 
 const SPACES = {
@@ -339,7 +254,7 @@ axes.frustumCulled = false;
 scene.add(axes);
 
 // スペクトル軌跡（単色光の色度を結んだ馬蹄形の線）と、純紫軌跡（両端の 380 nm と 780 nm を結ぶ線）。
-// 人が見られるすべての色は、この2本で囲まれた範囲に入る。sRGB の三角形はその内側の一部
+// 人が見られるすべての色は、この2本で囲まれた範囲に入る
 function makeLocus(toPoint) {
   const group = new THREE.Group();
   const points = SPECTRAL_LOCUS.map(([, x, y]) => toPoint(x, y));

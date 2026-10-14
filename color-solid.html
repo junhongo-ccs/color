@@ -6,13 +6,13 @@
 <!-- favicon（favicon.png は仮。同じファイル名で上書きすれば差し替わる） -->
 <link rel="icon" type="image/png" href="favicon.png" />
 <title>色度図に明るさを足して見る | xy色度図を立体で見る</title>
-<meta name="description" content="画面で出せる5,832色を点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
+<meta name="description" content="物の色としてありうる色を約6,400個の点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
 <!-- OGP（画像 ogp.png は仮。同じファイル名で上書きすれば差し替わる） -->
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="xy色度図を立体で見る" />
 <meta property="og:locale" content="ja_JP" />
 <meta property="og:title" content="色度図に明るさを足して見る | xy色度図を立体で見る" />
-<meta property="og:description" content="画面で出せる5,832色を点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
+<meta property="og:description" content="物の色としてありうる色を約6,400個の点にして、xy色度図に明るさを足した立体（xyY）の中まで眺めます。CIELAB への切り替えもできます。" />
 <meta property="og:url" content="https://junhongo-ccs.github.io/color/color-solid.html" />
 <meta property="og:image" content="https://junhongo-ccs.github.io/color/ogp.png" />
 <meta property="og:image:width" content="1200" />
@@ -117,81 +117,53 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 // スペクトル軌跡のデータ（CIE、CC BY-SA 4.0。出典はデータファイルの先頭を参照）
 import { SPECTRAL_LOCUS } from "./data/cie1931-spectral-locus.js";
+// 物体色の立体の計算（全ページ共通）
+import { maxY, displayLinear, xyzToLab, chromaticity, WHITE_XYZ } from "./js/object-color-solid.js";
 
 // ------------------------------------------------------------
-// 1. sRGB立方体をサンプリング
+// 1. 物体色の立体の中を点で埋める
+//
+// xy色度図の上に一定の間隔で点の柱を立て、各柱を「その色度で物体色として出せる最も明るい Y」まで伸ばす。
+// 柱の中の点は CIELAB の L* で等間隔に並べる（暗い側が詰まりすぎないように）。
 // ------------------------------------------------------------
-const N = 18; // 粗さ。24〜32にすると精密になるが点数は急増する
+const XY_STEP = 0.025;   // 柱の間隔（色度）。小さくすると精密になるが点数は急増する
+const L_STEP = 100 / 17; // 柱の中の点の間隔（L*）
 const xyyPositions = [];
 const labPositions = [];
 const colors = [];
 
-function srgbToLinear(c) {
-  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+// L* → Y（CIELAB の明度の式の逆）
+function lightnessToY(L) {
+  const f = (L + 16) / 116;
+  return f > 6 / 29 ? f ** 3 : 3 * (6 / 29) ** 2 * (f - 4 / 29);
 }
 
-// sRGB(D65) -> CIE XYZ
-const M = [
-  [0.4124564, 0.3575761, 0.1804375],
-  [0.2126729, 0.7151522, 0.0721750],
-  [0.0193339, 0.1191920, 0.9503041]
-];
+function pushPoint(xyz, [x, y]) {
+  const [L, A, B] = xyzToLab(xyz);
 
-// D65 白色点（XYZ と xy）
-const WHITE_XYZ = [0.95047, 1.0, 1.08883];
-const WHITE_XY = [0.3127, 0.3290];
+  // 表示用にスケール調整。明るさ（Y / L*）はどちらも -1.5〜4.5 に揃える。
+  // 色度 y と b* は -Z 方向に置き、真上から見たとき色度図・a*b*平面と同じ向きになるようにする。
+  xyyPositions.push((x - 0.33) * 8, xyz[1] * 6 - 1.5, -(y - 0.33) * 8);
+  labPositions.push(A * 0.025, (L / 100) * 6 - 1.5, -B * 0.025);
 
-// CIELAB の非線形関数
-const DELTA = 6 / 29;
-function labF(t) {
-  return t > DELTA ** 3 ? Math.cbrt(t) : t / (3 * DELTA * DELTA) + 4 / 29;
+  // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する。
+  // sRGB で出せない色は、近い色に置き換えて塗る
+  const lin = displayLinear(xyz);
+  colors.push(lin[0], lin[1], lin[2]);
 }
 
-for (let ri = 0; ri < N; ri++) {
-  for (let gi = 0; gi < N; gi++) {
-    for (let bi = 0; bi < N; bi++) {
-      const r = ri / (N - 1);
-      const g = gi / (N - 1);
-      const b = bi / (N - 1);
+// 黒（色度が決まらないので白色点の色度に置く）
+const WHITE_XY = chromaticity(WHITE_XYZ);
+pushPoint([0, 0, 0], WHITE_XY);
 
-      const lr = srgbToLinear(r);
-      const lg = srgbToLinear(g);
-      const lb = srgbToLinear(b);
-
-      const X = M[0][0] * lr + M[0][1] * lg + M[0][2] * lb;
-      const Y = M[1][0] * lr + M[1][1] * lg + M[1][2] * lb;
-      const Z = M[2][0] * lr + M[2][1] * lg + M[2][2] * lb;
-
-      // XYZ -> xyY（黒は色度が定義できないので白色点の色度に置く）
-      const sum = X + Y + Z;
-      const x = sum > 1e-12 ? X / sum : WHITE_XY[0];
-      const y = sum > 1e-12 ? Y / sum : WHITE_XY[1];
-
-      // XYZ -> CIELAB
-      const fx = labF(X / WHITE_XYZ[0]);
-      const fy = labF(Y / WHITE_XYZ[1]);
-      const fz = labF(Z / WHITE_XYZ[2]);
-      const L = 116 * fy - 16;
-      const A = 500 * (fx - fy);
-      const B = 200 * (fy - fz);
-
-      // 表示用にスケール調整。明るさ（Y / L*）はどちらも -1.5〜4.5 に揃える。
-      // 色度 y と b* は -Z 方向に置き、真上から見たとき色度図・a*b*平面と同じ向きになるようにする。
-      xyyPositions.push(
-        (x - 0.33) * 8,
-        Y * 6 - 1.5,
-        -(y - 0.33) * 8
-      );
-      labPositions.push(
-        A * 0.025,
-        (L / 100) * 6 - 1.5,
-        -B * 0.025
-      );
-
-      // three.js r152以降は頂点色をリニアとして扱い、出力時にsRGBへ変換する。
-      // 線形値を渡すことで、画面上の点色が元のsRGB色と一致する。
-      colors.push(lr, lg, lb);
-    }
+for (let x = XY_STEP / 2; x < 0.75; x += XY_STEP) {
+  for (let y = XY_STEP / 2; y < 0.85; y += XY_STEP) {
+    const top = maxY(x, y);
+    if (top < 1e-3) continue; // 馬蹄形の外
+    const toXYZ = (Y) => [(x / y) * Y, Y, ((1 - x - y) / y) * Y];
+    const topL = xyzToLab(toXYZ(top))[0];
+    for (let L = L_STEP; L < topL; L += L_STEP) pushPoint(toXYZ(lightnessToY(L)), [x, y]);
+    pushPoint(toXYZ(top), [x, y]); // 柱の先端は立体の表面
   }
 }
 
@@ -288,7 +260,7 @@ axes.frustumCulled = false;
 scene.add(axes);
 
 // スペクトル軌跡（単色光の色度を結んだ馬蹄形の線）と、純紫軌跡（両端の 380 nm と 780 nm を結ぶ線）。
-// 人が見られるすべての色は、この2本で囲まれた範囲に入る。sRGB の三角形はその内側の一部
+// 人が見られるすべての色は、この2本で囲まれた範囲に入る
 function makeLocus(toPoint) {
   const group = new THREE.Group();
   const points = SPECTRAL_LOCUS.map(([, x, y]) => toPoint(x, y));
